@@ -34,7 +34,7 @@ export default function Layout() {
       <Tabs.Screen
         name="index" // this is your redirect file
         options={{
-          href: null, // 👈 hides it from the tab bar
+          href: null, //  hides it from the tab bar
         }}
       />
     </Tabs>

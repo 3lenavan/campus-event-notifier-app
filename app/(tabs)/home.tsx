@@ -1,5 +1,5 @@
 import { auth } from "@/FirebaseConfig";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { getAuth } from "firebase/auth";
 import { router } from "expo-router";
 
@@ -15,12 +15,6 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Home</Text>
-
-      <TouchableOpacity onPress={() => auth.signOut()}>
-        <Text style={styles.title}>Sign Out</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.subtitle}>This is a placeholder home screen.</Text>
     </View>
   );
 }
