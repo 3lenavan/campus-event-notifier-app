@@ -27,7 +27,7 @@ export default function Index() {
       }
       const user = await signInWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
       if (user) {
-        router.replace("/(tabs)");
+        router.replace("/(tabs)/home");
       }
     } catch (error) {
       console.error(error);
@@ -48,7 +48,7 @@ export default function Index() {
       }
       const user = await createUserWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
       if (user) {
-        router.replace("/(tabs)");
+        router.replace("/(tabs)/home");
       }
     } catch (error) {
       console.error(error);
