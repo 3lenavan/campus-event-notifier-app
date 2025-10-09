@@ -4,6 +4,7 @@
     "strict": true,
     "jsx": "react-jsx",
     "paths": {
+      "firebase/auth": [ "./node_modules/@firebase/auth/dist/rn/index.rn.d.ts" ],
       "@/*": [
         "./*"
       ]

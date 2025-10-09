@@ -1,43 +1,28 @@
-import { useTheme } from "@react-navigation/native";
-import { router } from "expo-router";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { useState } from "react";
-import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from "react-native";
+import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useTheme } from "@react-navigation/native";
+import { useColorScheme } from "react-native";
+import { router } from "expo-router";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from "../FirebaseConfig";
 
-export default function Index() {
+export default function Signup() {
+  // Store form inputs
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const theme = useTheme();
   const colorScheme = useColorScheme();
-  
-  const isValidEmail = (value: string) => /.+@.+\..+/.test(value);
 
-  const signIn = async () => {
-    try {
-      const emailTrimmed = email.trim();
-      const passwordTrimmed = password.trim();
-      if (!isValidEmail(emailTrimmed)) {
-        console.log("Invalid email format");
-        return;
-      }
-      if (passwordTrimmed.length < 6) {
-        console.log("Password must be at least 6 characters");
-        return;
-      }
-      const user = await signInWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
-      if (user) {
-        router.replace("/(tabs)/home");
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  const isValidEmail = (value: string) => /.+@.+\..+/.test(value);
 
   const signUp = async () => {
     try {
       const emailTrimmed = email.trim();
       const passwordTrimmed = password.trim();
+
       if (!isValidEmail(emailTrimmed)) {
         console.log("Invalid email format");
         return;
@@ -46,23 +31,49 @@ export default function Index() {
         console.log("Password must be at least 6 characters");
         return;
       }
-      const user = await createUserWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
-      if (user) {
-        router.replace("/(tabs)/home");
-      }
+
+      // Create user with email & password
+      const userCredential = await createUserWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
+
+      // ✅ Save full name into displayName
+      await updateProfile(userCredential.user, {
+        displayName: `${firstName} ${lastName}`,
+      });
+
+      console.log("User registered:", userCredential.user);
+
+      // Redirect to home (inside tabs)
+      router.replace("/(tabs)/home");
     } catch (error) {
       console.error(error);
     }
   };
+
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background }]}> 
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background }]}>
       <View style={styles.container}>
-        <View style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}> 
-          <Text style={[styles.title, { color: theme.colors.text }]}>Welcome</Text>
-          <Text style={[styles.subtitle, { color: colorScheme === "dark" ? "#9aa0a6" : "#6b7280" }]}>Sign in or create an account</Text>
+        <View style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <Text style={[styles.title, { color: theme.colors.text }]}>Create Account</Text>
 
-          <View style={styles.spacer} />
+          {/* First Name Input */}
+          <TextInput
+            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: colorScheme === "dark" ? "#0f1113" : "#fff" }]}
+            placeholder="First Name"
+            placeholderTextColor={colorScheme === "dark" ? "#6b7280" : "#9aa0a6"}
+            value={firstName}
+            onChangeText={setFirstName}
+          />
 
+          {/* Last Name Input */}
+          <TextInput
+            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: colorScheme === "dark" ? "#0f1113" : "#fff" }]}
+            placeholder="Last Name"
+            placeholderTextColor={colorScheme === "dark" ? "#6b7280" : "#9aa0a6"}
+            value={lastName}
+            onChangeText={setLastName}
+          />
+
+          {/* Email Input */}
           <TextInput
             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: colorScheme === "dark" ? "#0f1113" : "#fff" }]}
             placeholder="Email"
@@ -74,6 +85,7 @@ export default function Index() {
             autoCorrect={false}
           />
 
+          {/* Password Input */}
           <TextInput
             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: colorScheme === "dark" ? "#0f1113" : "#fff" }]}
             placeholder="Password"
@@ -84,14 +96,14 @@ export default function Index() {
             autoCapitalize="none"
           />
 
-          <View style={styles.spacer} />
-
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]} onPress={signIn}>
-            <Text style={styles.primaryBtnText}>Sign In</Text>
+          {/* Submit button */}
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]} onPress={signUp}>
+            <Text style={styles.primaryBtnText}>Sign Up</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.secondaryBtn, { borderColor: theme.colors.border }]} onPress={() => router.replace("/signup")}>
-            <Text style={[styles.secondaryBtnText, { color: theme.colors.text }]}>Create Account</Text>
+          {/* Back to login */}
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.replace("/")}>
+            <Text style={[styles.secondaryBtnText, { color: theme.colors.text }]}>Back to Login</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -100,9 +112,7 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-  },
+  safe: { flex: 1 },
   container: {
     flex: 1,
     alignItems: "center",
@@ -124,11 +134,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "700",
-  },
-  subtitle: {
-    marginTop: 6,
-    fontSize: 14,
-    fontWeight: "400",
+    marginBottom: 12,
   },
   input: {
     width: "100%",
@@ -138,9 +144,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 12,
     fontSize: 16,
-  },
-  spacer: {
-    height: 8,
   },
   primaryBtn: {
     width: "100%",
@@ -163,6 +166,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 10,
     borderWidth: 1,
+    borderColor: "#ccc",
   },
   secondaryBtnText: {
     fontWeight: "600",
