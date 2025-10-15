@@ -1,5 +1,8 @@
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../FirebaseConfig";
+
 import {
   View,
   Text,
@@ -36,76 +39,79 @@ interface Event {
 }
 
 export default function Discover() {
-  const router = useRouter(); // ✅ FIX: initialize router
+  const router = useRouter();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedClubs, setExpandedClubs] = useState<Set<string>>(new Set());
   const [userNotifications, setUserNotifications] = useState(2);
 
-  // Example mock data
-  const clubs: Club[] = [
-    {
-      id: "1",
-      name: "Student Activities Board",
-      description: "Organizing fun events and activities for all students.",
-      category: "Social",
-    },
-    {
-      id: "2",
-      name: "Environmental Club",
-      description: "Making campus more sustainable and eco-friendly.",
-      category: "Academic",
-    },
-  ];
+  // ✅ Load real events from Firestore
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
-  const events: Event[] = [
-    {
-      id: "e1",
-      title: "Trivia Night",
-      description: "A fun campus-wide trivia competition.",
-      date: "2025-10-20",
-      time: "6:00 PM",
-      location: "Student Center",
-      category: "Social",
-      attendees: 25,
-      clubId: "1",
-      clubName: "Student Activities Board",
-    },
-    {
-      id: "e2",
-      title: "Campus Clean-Up",
-      description: "Join us to make our campus cleaner and greener.",
-      date: "2025-10-25",
-      time: "10:00 AM",
-      location: "Main Lawn",
-      category: "Academic",
-      attendees: 12,
-      clubId: "2",
-      clubName: "Environmental Club",
-    },
-  ];
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "events"));
+        const eventData = querySnapshot.docs.map((doc) => ({
+          ...(doc.data() as Event),
+          id: doc.id, // ✅ Correctly placed inside map
+        }));
+        setEvents(eventData);
+      } catch (error) {
+        console.error("Error fetching events:", error);
+      } finally {
+        setLoadingEvents(false);
+      }
+    };
 
-  // Filter clubs by search query
+    fetchEvents();
+  }, []);
+
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ✅ Fetch clubs from Firestore once when the screen loads
+  useEffect(() => {
+    const fetchClubs = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "clubs"));
+        const clubData = querySnapshot.docs.map((doc) => ({
+          ...(doc.data() as Club),
+          id: doc.id,
+        })) as Club[];
+        setClubs(clubData);
+      } catch (error) {
+        console.error("Error fetching clubs:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClubs();
+  }, []);
+
+  // ✅ Filter clubs by search query
   const filteredClubs = clubs.filter(
     (club) =>
       club.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       club.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Get events for a specific club
-  const getClubEvents = (clubId: string) => {
-    return events
+  // ✅ Get events for each club
+  const getClubEvents = (clubId: string) =>
+    events
       .filter((event) => event.clubId === clubId)
       .filter((event) => new Date(event.date) >= new Date())
       .sort(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
       );
-  };
 
   const toggleClubExpansion = (clubId: string) => {
     const newExpanded = new Set(expandedClubs);
-    if (newExpanded.has(clubId)) newExpanded.delete(clubId);
-    else newExpanded.add(clubId);
+    newExpanded.has(clubId)
+      ? newExpanded.delete(clubId)
+      : newExpanded.add(clubId);
     setExpandedClubs(newExpanded);
   };
 
@@ -123,6 +129,23 @@ export default function Discover() {
     return colors[category] || colors["Other"];
   };
 
+  // ✅ Loading state while fetching Firestore
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: "#6B7280" }}>Loading clubs...</Text>
+      </View>
+    );
+  }
+
+  if (loadingEvents) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: "#6B7280" }}>Loading events...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -132,7 +155,7 @@ export default function Discover() {
           <Text style={styles.headerSubtitle}>Find clubs and events</Text>
         </View>
 
-        {/* Notification Button */}
+        {/* Notifications */}
         <TouchableOpacity style={styles.notificationButton}>
           <Ionicons name="notifications-outline" size={22} color="#333" />
           {userNotifications > 0 && (
@@ -164,9 +187,7 @@ export default function Discover() {
         {filteredClubs.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No clubs found</Text>
-            <Text style={styles.emptySubText}>
-              Try a different search term
-            </Text>
+            <Text style={styles.emptySubText}>Try a different search term</Text>
           </View>
         ) : (
           filteredClubs.map((club) => {
@@ -208,7 +229,7 @@ export default function Discover() {
                   </View>
                 </View>
 
-                {/* Club Events */}
+                {/* Events list */}
                 {clubEvents.length > 0 ? (
                   <View style={styles.eventList}>
                     {eventsToShow.map((event) => (
@@ -224,7 +245,6 @@ export default function Discover() {
                         onRSVP={() => console.log("RSVP:", event.id)}
                       />
                     ))}
-
                     {hasMore && (
                       <TouchableOpacity
                         style={styles.showMoreButton}
@@ -262,6 +282,7 @@ export default function Discover() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     padding: 16,
     flexDirection: "row",
@@ -283,11 +304,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: { color: "white", fontSize: 10 },
-  searchContainer: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 4,
-  },
+  searchContainer: { marginHorizontal: 16, marginTop: 8, marginBottom: 4 },
   input: {
     backgroundColor: "white",
     borderRadius: 8,
