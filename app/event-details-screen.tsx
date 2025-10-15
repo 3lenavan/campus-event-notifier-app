@@ -1,5 +1,13 @@
+// Imports
 import { db, auth } from "../FirebaseConfig";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  collection,
+  addDoc,
+} from "firebase/firestore";
 
 import React, { useEffect, useState } from "react";
 import {
@@ -12,7 +20,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { onAuthStateChanged } from "firebase/auth";
 
+// Event interface
 interface Event {
   id: string;
   title: string;
@@ -29,14 +39,16 @@ interface Event {
   fullDescription?: string;
 }
 
+// Main Component
 export default function EventDetails() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  // ✅ Using real Firestore data (no more mock data)
+  // Event state
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Fetch event details from Firestore
   useEffect(() => {
     const fetchEvent = async () => {
       try {
@@ -58,6 +70,46 @@ export default function EventDetails() {
     fetchEvent();
   }, [id]);
 
+  // Track current logged-in user
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Handle RSVP + Notification
+  const handleRSVP = async (eventId: string, eventTitle: string): Promise<void> => {
+    try {
+      if (!currentUser) {
+        alert("Please log in to RSVP.");
+        return;
+      }
+
+      // Save RSVP in Firestore
+      await setDoc(doc(db, "rsvps", `${currentUser.uid}_${eventId}`), {
+        userId: currentUser.uid,
+        eventId: eventId,
+        timestamp: serverTimestamp(),
+      });
+
+      // Save notification for the user
+      await addDoc(collection(db, "notifications"), {
+        userId: currentUser.uid,
+        message: `You RSVP’d for ${eventTitle}!`,
+        timestamp: serverTimestamp(),
+        read: false,
+      });
+
+      alert(`You have RSVP’d for “${eventTitle}” successfully!`);
+    } catch (error) {
+      console.error("Error RSVPing:", error);
+      alert("Something went wrong. Please try again.");
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -77,28 +129,7 @@ export default function EventDetails() {
     );
   }
 
-  const handleRSVP = async (eventId: string) => {
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        alert("Please log in to RSVP.");
-        return;
-      }
-
-      await setDoc(doc(db, "rsvps", `${user.uid}_${eventId}`), {
-        userId: user.uid,
-        eventId: eventId,
-        timestamp: serverTimestamp(),
-      });
-
-      alert("You have RSVP’d successfully!");
-    } catch (error) {
-      console.error("Error RSVPing:", error);
-      alert("Something went wrong. Please try again.");
-    }
-  };
-
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", {
       weekday: "long",
@@ -108,7 +139,7 @@ export default function EventDetails() {
     });
   };
 
-  const getCategoryColor = (category: string) => {
+  const getCategoryColor = (category: string): string => {
     const colors: Record<string, string> = {
       Academic: "#3B82F6",
       Social: "#10B981",
@@ -138,16 +169,10 @@ export default function EventDetails() {
         </TouchableOpacity>
 
         <View style={styles.iconRow}>
-          <TouchableOpacity
-            onPress={() => console.log("Shared")}
-            style={styles.iconButton}
-          >
+          <TouchableOpacity onPress={() => console.log("Shared")} style={styles.iconButton}>
             <Ionicons name="share-outline" size={20} color="#111" />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => console.log("Favorited")}
-            style={styles.iconButton}
-          >
+          <TouchableOpacity onPress={() => console.log("Favorited")} style={styles.iconButton}>
             <Ionicons name="heart-outline" size={20} color="#111" />
           </TouchableOpacity>
         </View>
@@ -181,12 +206,7 @@ export default function EventDetails() {
         {/* Event Info */}
         <View style={styles.card}>
           <View style={styles.infoRow}>
-            <Ionicons
-              name="calendar-outline"
-              size={20}
-              color="#6B7280"
-              style={styles.icon}
-            />
+            <Ionicons name="calendar-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
               <Text style={styles.infoTitle}>{formatDate(event.date)}</Text>
               <Text style={styles.infoSubtitle}>Date</Text>
@@ -194,12 +214,7 @@ export default function EventDetails() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons
-              name="time-outline"
-              size={20}
-              color="#6B7280"
-              style={styles.icon}
-            />
+            <Ionicons name="time-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
               <Text style={styles.infoTitle}>{event.time}</Text>
               <Text style={styles.infoSubtitle}>Time</Text>
@@ -207,12 +222,7 @@ export default function EventDetails() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons
-              name="location-outline"
-              size={20}
-              color="#6B7280"
-              style={styles.icon}
-            />
+            <Ionicons name="location-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
               <Text style={styles.infoTitle}>{event.location}</Text>
               <Text style={styles.infoSubtitle}>Location</Text>
@@ -220,12 +230,7 @@ export default function EventDetails() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons
-              name="people-outline"
-              size={20}
-              color="#6B7280"
-              style={styles.icon}
-            />
+            <Ionicons name="people-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
               <Text style={styles.infoTitle}>
                 {event.attendees} attending
@@ -251,7 +256,7 @@ export default function EventDetails() {
           )}
         </View>
 
-        {/* RSVP */}
+        {/* RSVP Button */}
         <View style={styles.card}>
           {isEventPast ? (
             <TouchableOpacity style={[styles.button, styles.disabled]}>
@@ -266,11 +271,9 @@ export default function EventDetails() {
               <TouchableOpacity
                 style={[
                   styles.button,
-                  event.isUserAttending
-                    ? styles.cancelButton
-                    : styles.rsvpButton,
+                  event.isUserAttending ? styles.cancelButton : styles.rsvpButton,
                 ]}
-                onPress={() => handleRSVP(event.id)}
+                onPress={() => handleRSVP(event.id, event.title)}
               >
                 <Text
                   style={[
@@ -297,8 +300,6 @@ export default function EventDetails() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  notFound: { fontSize: 16, color: "#6B7280", marginBottom: 10 },
-  backLink: { padding: 8 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -309,28 +310,13 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
   },
   backButton: { flexDirection: "row", alignItems: "center" },
-  backText: {
-    marginLeft: 6,
-    fontSize: 15,
-    color: "#111827",
-    fontWeight: "500",
-  },
+  backText: { marginLeft: 6, fontSize: 15, color: "#111827", fontWeight: "500" },
   iconRow: { flexDirection: "row" },
   iconButton: { marginLeft: 12 },
   imageHeader: { height: 160, justifyContent: "center", alignItems: "center" },
   imageOverlay: { alignItems: "center" },
-  title: {
-    color: "white",
-    fontSize: 22,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  badge: {
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
+  title: { color: "white", fontSize: 22, fontWeight: "bold", textAlign: "center" },
+  badge: { marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   badgeText: { color: "white", fontWeight: "500", fontSize: 12 },
   scrollContent: { padding: 16, paddingBottom: 100 },
   card: {
