@@ -1,13 +1,7 @@
 import { useRouter } from "expo-router";
 import React, { useState, useEffect } from "react";
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-  onSnapshot,
-} from "firebase/firestore";
-import { db, auth } from "../../FirebaseConfig";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../FirebaseConfig";
 
 import {
   View,
@@ -52,30 +46,6 @@ export default function Discover() {
   // Search + expand state
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedClubs, setExpandedClubs] = useState<Set<string>>(new Set());
-
-  // Notification counter (starts at 0)
-  const [userNotifications, setUserNotifications] = useState(0);
-
-  // Real-time listener for unread notifications
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    // Listen to all notifications where the userId matches
-    const q = query(
-      collection(db, "notifications"),
-      where("userId", "==", user.uid),
-      where("read", "==", false)
-    );
-
-    // onSnapshot = listens for live Firestore changes
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setUserNotifications(snapshot.size);
-    });
-
-    // Clean up listener when screen unmounts
-    return () => unsubscribe();
-  }, []);
 
   // Load events from Firestore
   const [events, setEvents] = useState<Event[]>([]);
@@ -189,19 +159,6 @@ export default function Discover() {
           <Text style={styles.headerTitle}>Discover</Text>
           <Text style={styles.headerSubtitle}>Find clubs and events</Text>
         </View>
-
-        {/* Notification bell */}
-        <TouchableOpacity
-  style={styles.notificationButton}
-  onPress={() => router.push("/notifications-screen")}
->
-  <Ionicons name="notifications-outline" size={22} color="#333" />
-          {userNotifications > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{userNotifications}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
       </View>
 
       {/* Search bar */}
@@ -282,7 +239,6 @@ export default function Discover() {
                             params: { id: event.id },
                           })
                         }
-                        onRSVP={() => console.log("RSVP:", event.id)}
                       />
                     ))}
 
@@ -337,16 +293,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: "bold" },
   headerSubtitle: { fontSize: 13, color: "#6B7280" },
-  notificationButton: { position: "relative" },
-  badge: {
-    position: "absolute",
-    right: -5,
-    top: -5,
-    backgroundColor: "#EF4444",
-    borderRadius: 8,
-    paddingHorizontal: 4,
-  },
-  badgeText: { color: "white", fontSize: 10 },
+
   searchContainer: { marginHorizontal: 16, marginTop: 8, marginBottom: 4 },
   input: {
     backgroundColor: "white",

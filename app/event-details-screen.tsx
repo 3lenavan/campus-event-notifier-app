@@ -1,14 +1,6 @@
 // Imports
-import { db, auth } from "../FirebaseConfig";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-  collection,
-  addDoc,
-} from "firebase/firestore";
-
+import { db } from "../FirebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -20,7 +12,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { onAuthStateChanged } from "firebase/auth";
 
 // Event interface
 interface Event {
@@ -34,7 +25,6 @@ interface Event {
   attendees: number;
   maxAttendees?: number;
   imageUrl?: string;
-  isUserAttending?: boolean;
   organizer?: string;
   fullDescription?: string;
 }
@@ -70,46 +60,6 @@ export default function EventDetails() {
     fetchEvent();
   }, [id]);
 
-  // Track current logged-in user
-  const [currentUser, setCurrentUser] = useState<any>(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-    });
-    return () => unsubscribe();
-  }, []);
-
-    // Handle RSVP + Notification
-  const handleRSVP = async (eventId: string, eventTitle: string): Promise<void> => {
-    try {
-      if (!currentUser) {
-        alert("Please log in to RSVP.");
-        return;
-      }
-
-      // Save RSVP in Firestore
-      await setDoc(doc(db, "rsvps", `${currentUser.uid}_${eventId}`), {
-        userId: currentUser.uid,
-        eventId: eventId,
-        timestamp: serverTimestamp(),
-      });
-
-      // Save notification for the user
-      await addDoc(collection(db, "notifications"), {
-        userId: currentUser.uid,
-        message: `You RSVP’d for ${eventTitle}!`,
-        timestamp: serverTimestamp(),
-        read: false,
-      });
-
-      alert(`You have RSVP’d for “${eventTitle}” successfully!`);
-    } catch (error) {
-      console.error("Error RSVPing:", error);
-      alert("Something went wrong. Please try again.");
-    }
-  };
-
   if (loading) {
     return (
       <View style={styles.center}>
@@ -129,6 +79,7 @@ export default function EventDetails() {
     );
   }
 
+  // Format event date
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", {
@@ -139,6 +90,7 @@ export default function EventDetails() {
     });
   };
 
+  // Category colors
   const getCategoryColor = (category: string): string => {
     const colors: Record<string, string> = {
       Academic: "#3B82F6",
@@ -150,10 +102,6 @@ export default function EventDetails() {
     };
     return colors[category] || colors["Other"];
   };
-
-  const isEventFull =
-    event.maxAttendees && event.attendees >= event.maxAttendees;
-  const isEventPast = new Date(event.date) < new Date();
 
   return (
     <View style={styles.container}>
@@ -169,10 +117,16 @@ export default function EventDetails() {
         </TouchableOpacity>
 
         <View style={styles.iconRow}>
-          <TouchableOpacity onPress={() => console.log("Shared")} style={styles.iconButton}>
+          <TouchableOpacity
+            onPress={() => console.log("Shared")}
+            style={styles.iconButton}
+          >
             <Ionicons name="share-outline" size={20} color="#111" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => console.log("Favorited")} style={styles.iconButton}>
+          <TouchableOpacity
+            onPress={() => console.log("Favorited")}
+            style={styles.iconButton}
+          >
             <Ionicons name="heart-outline" size={20} color="#111" />
           </TouchableOpacity>
         </View>
@@ -201,12 +155,16 @@ export default function EventDetails() {
         )}
       </View>
 
-      {/* Content */}
+      {/* Event details */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Event Info */}
         <View style={styles.card}>
           <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={20} color="#6B7280" style={styles.icon} />
+            <Ionicons
+              name="calendar-outline"
+              size={20}
+              color="#6B7280"
+              style={styles.icon}
+            />
             <View>
               <Text style={styles.infoTitle}>{formatDate(event.date)}</Text>
               <Text style={styles.infoSubtitle}>Date</Text>
@@ -214,7 +172,12 @@ export default function EventDetails() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="time-outline" size={20} color="#6B7280" style={styles.icon} />
+            <Ionicons
+              name="time-outline"
+              size={20}
+              color="#6B7280"
+              style={styles.icon}
+            />
             <View>
               <Text style={styles.infoTitle}>{event.time}</Text>
               <Text style={styles.infoSubtitle}>Time</Text>
@@ -222,7 +185,12 @@ export default function EventDetails() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={20} color="#6B7280" style={styles.icon} />
+            <Ionicons
+              name="location-outline"
+              size={20}
+              color="#6B7280"
+              style={styles.icon}
+            />
             <View>
               <Text style={styles.infoTitle}>{event.location}</Text>
               <Text style={styles.infoSubtitle}>Location</Text>
@@ -230,7 +198,12 @@ export default function EventDetails() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="people-outline" size={20} color="#6B7280" style={styles.icon} />
+            <Ionicons
+              name="people-outline"
+              size={20}
+              color="#6B7280"
+              style={styles.icon}
+            />
             <View>
               <Text style={styles.infoTitle}>
                 {event.attendees} attending
@@ -241,7 +214,6 @@ export default function EventDetails() {
           </View>
         </View>
 
-        {/* About */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>About this event</Text>
           <Text style={styles.description}>
@@ -253,43 +225,6 @@ export default function EventDetails() {
               <Text style={styles.sectionTitle}>Organizer</Text>
               <Text style={styles.organizerText}>{event.organizer}</Text>
             </View>
-          )}
-        </View>
-
-        {/* RSVP Button */}
-        <View style={styles.card}>
-          {isEventPast ? (
-            <TouchableOpacity style={[styles.button, styles.disabled]}>
-              <Text style={styles.buttonText}>Event has ended</Text>
-            </TouchableOpacity>
-          ) : isEventFull && !event.isUserAttending ? (
-            <TouchableOpacity style={[styles.button, styles.disabled]}>
-              <Text style={styles.buttonText}>Event is full</Text>
-            </TouchableOpacity>
-          ) : (
-            <>
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  event.isUserAttending ? styles.cancelButton : styles.rsvpButton,
-                ]}
-                onPress={() => handleRSVP(event.id, event.title)}
-              >
-                <Text
-                  style={[
-                    styles.buttonText,
-                    event.isUserAttending && styles.cancelText,
-                  ]}
-                >
-                  {event.isUserAttending ? "Cancel RSVP" : "RSVP to Event"}
-                </Text>
-              </TouchableOpacity>
-              <Text style={styles.rsvpNote}>
-                {event.isUserAttending
-                  ? "You're attending this event"
-                  : "Join other students at this event"}
-              </Text>
-            </>
           )}
         </View>
       </ScrollView>
@@ -310,13 +245,28 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
   },
   backButton: { flexDirection: "row", alignItems: "center" },
-  backText: { marginLeft: 6, fontSize: 15, color: "#111827", fontWeight: "500" },
+  backText: {
+    marginLeft: 6,
+    fontSize: 15,
+    color: "#111827",
+    fontWeight: "500",
+  },
   iconRow: { flexDirection: "row" },
   iconButton: { marginLeft: 12 },
   imageHeader: { height: 160, justifyContent: "center", alignItems: "center" },
   imageOverlay: { alignItems: "center" },
-  title: { color: "white", fontSize: 22, fontWeight: "bold", textAlign: "center" },
-  badge: { marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  title: {
+    color: "white",
+    fontSize: 22,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  badge: {
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
   badgeText: { color: "white", fontWeight: "500", fontSize: 12 },
   scrollContent: { padding: 16, paddingBottom: 100 },
   card: {
@@ -341,22 +291,5 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   organizerText: { color: "#6B7280", fontSize: 14 },
-  button: {
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  rsvpButton: { backgroundColor: "#3B82F6" },
-  cancelButton: { backgroundColor: "#E5E7EB" },
-  buttonText: { color: "white", fontWeight: "600" },
-  cancelText: { color: "#111827" },
-  disabled: { backgroundColor: "#9CA3AF" },
-  rsvpNote: {
-    textAlign: "center",
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 6,
-  },
   eventImage: { width: "100%", height: "100%" },
 });

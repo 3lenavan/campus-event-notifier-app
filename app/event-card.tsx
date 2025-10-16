@@ -181,28 +181,6 @@ export function EventCard({
             </Text>
           </View>
         </View>
-
-        {onRSVP && (
-          <TouchableOpacity
-            style={[
-              styles.rsvpButton,
-              event.isUserAttending && styles.cancelButton,
-            ]}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              onRSVP(event.id);
-            }}
-          >
-            <Text
-              style={[
-                styles.rsvpText,
-                event.isUserAttending && styles.cancelText,
-              ]}
-            >
-              {event.isUserAttending ? "Cancel RSVP" : "RSVP"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     </TouchableOpacity>
   );
