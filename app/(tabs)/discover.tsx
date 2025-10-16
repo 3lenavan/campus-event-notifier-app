@@ -191,8 +191,11 @@ export default function Discover() {
         </View>
 
         {/* Notification bell */}
-        <TouchableOpacity style={styles.notificationButton}>
-          <Ionicons name="notifications-outline" size={22} color="#333" />
+        <TouchableOpacity
+  style={styles.notificationButton}
+  onPress={() => router.push("/notifications-screen")}
+>
+  <Ionicons name="notifications-outline" size={22} color="#333" />
           {userNotifications > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{userNotifications}</Text>

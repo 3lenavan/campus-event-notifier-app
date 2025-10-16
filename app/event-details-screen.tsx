@@ -80,7 +80,7 @@ export default function EventDetails() {
     return () => unsubscribe();
   }, []);
 
-  // Handle RSVP + Notification
+    // Handle RSVP + Notification
   const handleRSVP = async (eventId: string, eventTitle: string): Promise<void> => {
     try {
       if (!currentUser) {
