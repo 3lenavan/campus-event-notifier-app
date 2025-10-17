@@ -8,7 +8,6 @@ import {
   collection,
   addDoc,
 } from "firebase/firestore";
-
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -48,7 +47,7 @@ export default function EventDetails() {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch event details from Firestore
+  // Fetch event details
   useEffect(() => {
     const fetchEvent = async () => {
       try {
@@ -66,36 +65,30 @@ export default function EventDetails() {
         setLoading(false);
       }
     };
-
     fetchEvent();
   }, [id]);
 
-  // Track current logged-in user
+  // Track logged-in user
   const [currentUser, setCurrentUser] = useState<any>(null);
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-    });
+    const unsubscribe = onAuthStateChanged(auth, (user) => setCurrentUser(user));
     return () => unsubscribe();
   }, []);
 
-  // Handle RSVP + Notification
-  const handleRSVP = async (eventId: string, eventTitle: string): Promise<void> => {
+  // Handle RSVP
+  const handleRSVP = async (eventId: string, eventTitle: string) => {
     try {
       if (!currentUser) {
         alert("Please log in to RSVP.");
         return;
       }
 
-      // Save RSVP in Firestore
       await setDoc(doc(db, "rsvps", `${currentUser.uid}_${eventId}`), {
         userId: currentUser.uid,
         eventId: eventId,
         timestamp: serverTimestamp(),
       });
 
-      // Save notification for the user
       await addDoc(collection(db, "notifications"), {
         userId: currentUser.uid,
         message: `You RSVP’d for ${eventTitle}!`,
@@ -129,6 +122,7 @@ export default function EventDetails() {
     );
   }
 
+  // Helpers
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", {
@@ -139,10 +133,6 @@ export default function EventDetails() {
     });
   };
 
-<<<<<<< HEAD
-  // Category colors
-=======
->>>>>>> UI/Org-cards
   const getCategoryColor = (category: string): string => {
     const colors: Record<string, string> = {
       Academic: "#3B82F6",
@@ -173,22 +163,16 @@ export default function EventDetails() {
         </TouchableOpacity>
 
         <View style={styles.iconRow}>
-          <TouchableOpacity
-            onPress={() => console.log("Shared")}
-            style={styles.iconButton}
-          >
+          <TouchableOpacity onPress={() => console.log("Shared")} style={styles.iconButton}>
             <Ionicons name="share-outline" size={20} color="#111" />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => console.log("Favorited")}
-            style={styles.iconButton}
-          >
+          <TouchableOpacity onPress={() => console.log("Favorited")} style={styles.iconButton}>
             <Ionicons name="heart-outline" size={20} color="#111" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Image / Header */}
+      {/* Banner */}
       <View
         style={[
           styles.imageHeader,
@@ -211,16 +195,12 @@ export default function EventDetails() {
         )}
       </View>
 
-      {/* Event details */}
+      {/* Content */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Info */}
         <View style={styles.card}>
           <View style={styles.infoRow}>
-            <Ionicons
-              name="calendar-outline"
-              size={20}
-              color="#6B7280"
-              style={styles.icon}
-            />
+            <Ionicons name="calendar-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
               <Text style={styles.infoTitle}>{formatDate(event.date)}</Text>
               <Text style={styles.infoSubtitle}>Date</Text>
@@ -228,12 +208,7 @@ export default function EventDetails() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons
-              name="time-outline"
-              size={20}
-              color="#6B7280"
-              style={styles.icon}
-            />
+            <Ionicons name="time-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
               <Text style={styles.infoTitle}>{event.time}</Text>
               <Text style={styles.infoSubtitle}>Time</Text>
@@ -241,12 +216,7 @@ export default function EventDetails() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons
-              name="location-outline"
-              size={20}
-              color="#6B7280"
-              style={styles.icon}
-            />
+            <Ionicons name="location-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
               <Text style={styles.infoTitle}>{event.location}</Text>
               <Text style={styles.infoSubtitle}>Location</Text>
@@ -254,12 +224,7 @@ export default function EventDetails() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons
-              name="people-outline"
-              size={20}
-              color="#6B7280"
-              style={styles.icon}
-            />
+            <Ionicons name="people-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
               <Text style={styles.infoTitle}>
                 {event.attendees} attending
@@ -270,6 +235,7 @@ export default function EventDetails() {
           </View>
         </View>
 
+        {/* Description */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>About this event</Text>
           <Text style={styles.description}>
@@ -284,7 +250,7 @@ export default function EventDetails() {
           )}
         </View>
 
-        {/* RSVP Button */}
+        {/* RSVP */}
         <View style={styles.card}>
           {isEventPast ? (
             <TouchableOpacity style={[styles.button, styles.disabled]}>
@@ -325,6 +291,7 @@ export default function EventDetails() {
   );
 }
 
+// Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -338,28 +305,13 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
   },
   backButton: { flexDirection: "row", alignItems: "center" },
-  backText: {
-    marginLeft: 6,
-    fontSize: 15,
-    color: "#111827",
-    fontWeight: "500",
-  },
+  backText: { marginLeft: 6, fontSize: 15, color: "#111827", fontWeight: "500" },
   iconRow: { flexDirection: "row" },
   iconButton: { marginLeft: 12 },
   imageHeader: { height: 160, justifyContent: "center", alignItems: "center" },
   imageOverlay: { alignItems: "center" },
-  title: {
-    color: "white",
-    fontSize: 22,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  badge: {
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
+  title: { color: "white", fontSize: 22, fontWeight: "bold", textAlign: "center" },
+  badge: { marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   badgeText: { color: "white", fontWeight: "500", fontSize: 12 },
   scrollContent: { padding: 16, paddingBottom: 100 },
   card: {
