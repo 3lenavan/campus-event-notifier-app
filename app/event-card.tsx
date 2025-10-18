@@ -1,14 +1,14 @@
 import React from "react";
 import {
-  View,
+  Image,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Image,
+  View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-interface Event {
+export interface Event {
   id: string;
   title: string;
   description: string;
@@ -26,6 +26,11 @@ interface EventCardProps {
   event: Event;
   onPress: (event: Event) => void;
   onRSVP?: (eventId: string) => void;
+  onLike?: (eventId: string) => void;
+  onFavorite?: (eventId: string) => void;
+  liked?: boolean;
+  favorited?: boolean;
+  likesCount?: number;
   compact?: boolean;
 }
 
@@ -33,6 +38,11 @@ export function EventCard({
   event,
   onPress,
   onRSVP,
+  onLike,
+  onFavorite,
+  liked = false,
+  favorited = false,
+  likesCount,
   compact = false,
 }: EventCardProps) {
   const formatDate = (dateStr: string) => {
@@ -181,6 +191,72 @@ export function EventCard({
             </Text>
           </View>
         </View>
+
+        {/* Action row similar to Instagram: like and favorite */}
+        {(onLike || onFavorite) && (
+          <View style={styles.actionRow}>
+            {onLike && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onLike(event.id);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={liked ? "heart" : "heart-outline"}
+                  size={22}
+                  color={liked ? "#EF4444" : "#111827"}
+                  style={{ marginRight: 6 }}
+                />
+                {typeof likesCount === "number" && (
+                  <Text style={styles.likesText}>{likesCount}</Text>
+                )}
+              </TouchableOpacity>
+            )}
+
+            {onFavorite && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onFavorite(event.id);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={favorited ? "bookmark" : "bookmark-outline"}
+                  size={22}
+                  color={favorited ? "#111827" : "#111827"}
+                  style={{ marginRight: 2 }}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {onRSVP && (
+          <TouchableOpacity
+            style={[
+              styles.rsvpButton,
+              event.isUserAttending && styles.cancelButton,
+            ]}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onRSVP(event.id);
+            }}
+          >
+            <Text
+              style={[
+                styles.rsvpText,
+                event.isUserAttending && styles.cancelText,
+              ]}
+            >
+              {event.isUserAttending ? "Cancel RSVP" : "RSVP"}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -221,6 +297,19 @@ const styles = StyleSheet.create({
   rsvpText: { color: "white", fontWeight: "600" },
   cancelButton: { backgroundColor: "#E5E7EB" },
   cancelText: { color: "#111827" },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  likesText: { fontSize: 13, color: "#111827" },
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
