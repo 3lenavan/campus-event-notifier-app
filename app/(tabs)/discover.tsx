@@ -1,30 +1,22 @@
-import { useRouter } from "expo-router";
-import React, { useState, useEffect } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../FirebaseConfig";
-
-import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import EventCard from "../event-card"; // make sure this path is correct
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { useAuthUser } from "../../src/hooks/useAuthUser";
+import { getLS, LS_KEYS } from "../../src/lib/localStorage";
+import { listEvents } from "../../src/services/eventsService";
+import { Club } from "../../src/types";
+import EventCard from "../event-card";
 
-// Club data structure
-interface Club {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  imageUrl?: string;
-}
-
-// Event data structure
-interface Event {
+// Legacy event interface for compatibility with existing EventCard component
+interface LegacyEvent {
   id: string;
   title: string;
   description: string;
@@ -42,24 +34,38 @@ interface Event {
 
 export default function Discover() {
   const router = useRouter();
+  const { user, profile } = useAuthUser();
 
   // Search + expand state
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedClubs, setExpandedClubs] = useState<Set<string>>(new Set());
 
-  // Load events from Firestore
-  const [events, setEvents] = useState<Event[]>([]);
+  // Load events from Local Storage
+  const [events, setEvents] = useState<LegacyEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "events"));
-        const eventData = querySnapshot.docs.map((doc) => ({
-          ...(doc.data() as Event),
-          id: doc.id, // attach Firestore document ID
+        const eventsData = await listEvents();
+        // Convert new Event format to legacy format for EventCard compatibility
+        const legacyEvents: LegacyEvent[] = eventsData.map(event => ({
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          date: new Date(event.dateISO).toISOString().split('T')[0],
+          time: new Date(event.dateISO).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+          }),
+          location: event.location,
+          category: 'Club Event', // Default category
+          attendees: 0, // Default attendees
+          clubId: event.clubId,
+          clubName: 'Unknown Club', // Will be resolved below
         }));
-        setEvents(eventData);
+        setEvents(legacyEvents);
       } catch (error) {
         console.error("Error fetching events:", error);
       } finally {
@@ -70,19 +76,15 @@ export default function Discover() {
     fetchEvents();
   }, []);
 
-  // Load clubs from Firestore
+  // Load clubs from Local Storage
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchClubs = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "clubs"));
-        const clubData = querySnapshot.docs.map((doc) => ({
-          ...(doc.data() as Club),
-          id: doc.id,
-        })) as Club[];
-        setClubs(clubData);
+        const clubsData = await getLS<Club[]>(LS_KEYS.CLUBS, []);
+        setClubs(clubsData);
       } catch (error) {
         console.error("Error fetching clubs:", error);
       } finally {
@@ -97,7 +99,7 @@ export default function Discover() {
   const filteredClubs = clubs.filter(
     (club) =>
       club.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      club.description.toLowerCase().includes(searchQuery.toLowerCase())
+      club.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Groups and sorts events by club
@@ -108,6 +110,11 @@ export default function Discover() {
       .sort(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
       );
+
+  // Check if user can create events for a club
+  const canCreateEvent = (clubId: string) => {
+    return profile?.role === 'member' && profile?.memberships.includes(clubId);
+  };
 
   // Toggles club expand/collapse
   const toggleClubExpansion = (clubId: string) => {
@@ -206,7 +213,7 @@ export default function Discover() {
                   <View style={styles.clubInfo}>
                     <Text style={styles.clubName}>{club.name}</Text>
                     <Text style={styles.clubDescription}>
-                      {club.description}
+                      {club.category}
                     </Text>
 
                     <View style={styles.badgeRow}>
@@ -218,11 +225,34 @@ export default function Discover() {
                       >
                         <Text style={styles.categoryText}>{club.category}</Text>
                       </View>
+                      
+                      {/* Membership indicator */}
+                      {profile?.memberships.includes(club.id) && (
+                        <View style={styles.membershipBadge}>
+                          <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                          <Text style={styles.membershipText}>Member</Text>
+                        </View>
+                      )}
+                      
                       <Text style={styles.eventCount}>
                         {clubEvents.length} upcoming event
                         {clubEvents.length !== 1 ? "s" : ""}
                       </Text>
                     </View>
+
+                    {/* Create Event Button - only show if user is a member */}
+                    {canCreateEvent(club.id) && (
+                      <TouchableOpacity
+                        style={styles.createEventButton}
+                        onPress={() => router.push({
+                          pathname: '/create-event',
+                          params: { clubId: club.id }
+                        })}
+                      >
+                        <Ionicons name="add-circle" size={16} color="#3B82F6" />
+                        <Text style={styles.createEventButtonText}>Create Event</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
 
@@ -350,5 +380,38 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     marginTop: 8,
     fontSize: 13,
+  },
+  createEventButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EBF4FF",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  createEventButtonText: {
+    color: "#3B82F6",
+    fontSize: 12,
+    fontWeight: "500",
+    marginLeft: 4,
+  },
+  membershipBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F0FDF4",
+    borderWidth: 1,
+    borderColor: "#10B981",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  membershipText: {
+    color: "#065F46",
+    fontSize: 10,
+    fontWeight: "500",
+    marginLeft: 2,
   },
 });

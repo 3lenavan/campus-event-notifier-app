@@ -3,6 +3,7 @@ import { getAuth } from "firebase/auth";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import snhuClubs from "../../data/snhu_clubs_with_hashes.json";
+import { useAuthUser } from "../../src/hooks/useAuthUser";
 import EventCard, { Event as BaseEvent } from "../event-card";
 
 type FeedEvent = BaseEvent & {
@@ -17,6 +18,8 @@ type FeedEvent = BaseEvent & {
 };
 
 export default function HomeScreen() {
+  const { user, profile } = useAuthUser();
+  
   useEffect(() => {
     const unsub = getAuth().onAuthStateChanged((user) => {
       if (!user) {

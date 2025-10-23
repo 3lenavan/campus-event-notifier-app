@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { useState } from "react";
 import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from "react-native";
-import { auth } from "../FirebaseConfig";
+import { auth } from "../src/lib/firebase";
 
 export default function Index() {
   const [email, setEmail] = useState("");
@@ -18,19 +18,50 @@ export default function Index() {
       const emailTrimmed = email.trim();
       const passwordTrimmed = password.trim();
       if (!isValidEmail(emailTrimmed)) {
-        console.log("Invalid email format");
+        alert("Please enter a valid email address");
         return;
       }
       if (passwordTrimmed.length < 6) {
-        console.log("Password must be at least 6 characters");
+        alert("Password must be at least 6 characters long");
         return;
       }
       const user = await signInWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
       if (user) {
+        alert("Signed in successfully!");
         router.replace("/(tabs)/home");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      
+      // Handle specific Firebase auth errors
+      let errorMessage = 'Sign in failed';
+      
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/user-not-found':
+            errorMessage = 'No account found with this email. Please sign up first.';
+            break;
+          case 'auth/wrong-password':
+            errorMessage = 'Incorrect password. Please try again.';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Please enter a valid email address.';
+            break;
+          case 'auth/user-disabled':
+            errorMessage = 'This account has been disabled.';
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = 'Too many failed attempts. Please try again later.';
+            break;
+          case 'auth/network-request-failed':
+            errorMessage = 'Network error. Please check your internet connection.';
+            break;
+          default:
+            errorMessage = error.message || 'Sign in failed';
+        }
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -39,19 +70,44 @@ export default function Index() {
       const emailTrimmed = email.trim();
       const passwordTrimmed = password.trim();
       if (!isValidEmail(emailTrimmed)) {
-        console.log("Invalid email format");
+        alert("Please enter a valid email address");
         return;
       }
       if (passwordTrimmed.length < 6) {
-        console.log("Password must be at least 6 characters");
+        alert("Password must be at least 6 characters long");
         return;
       }
       const user = await createUserWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
       if (user) {
+        alert("Account created successfully!");
         router.replace("/(tabs)/home");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      
+      // Handle specific Firebase auth errors
+      let errorMessage = 'Account creation failed';
+      
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = 'This email is already registered. Please sign in instead.';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Please enter a valid email address.';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'Password should be at least 6 characters long.';
+            break;
+          case 'auth/network-request-failed':
+            errorMessage = 'Network error. Please check your internet connection.';
+            break;
+          default:
+            errorMessage = error.message || 'Account creation failed';
+        }
+      }
+      
+      alert(errorMessage);
     }
   };
   return (

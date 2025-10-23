@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useTheme } from "@react-navigation/native";
-import { useColorScheme } from "react-native";
 import { router } from "expo-router";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { auth } from "../FirebaseConfig";
+import { useState } from "react";
+import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from "react-native";
+import { auth } from "../src/lib/firebase";
 
 export default function Signup() {
   // Store form inputs
@@ -23,12 +22,17 @@ export default function Signup() {
       const emailTrimmed = email.trim();
       const passwordTrimmed = password.trim();
 
+      if (!firstName.trim() || !lastName.trim()) {
+        alert("Please enter both first and last name");
+        return;
+      }
+
       if (!isValidEmail(emailTrimmed)) {
-        console.log("Invalid email format");
+        alert("Please enter a valid email address");
         return;
       }
       if (passwordTrimmed.length < 6) {
-        console.log("Password must be at least 6 characters");
+        alert("Password must be at least 6 characters long");
         return;
       }
 
@@ -37,15 +41,40 @@ export default function Signup() {
 
       // ✅ Save full name into displayName
       await updateProfile(userCredential.user, {
-        displayName: `${firstName} ${lastName}`,
+        displayName: `${firstName.trim()} ${lastName.trim()}`,
       });
 
       console.log("User registered:", userCredential.user);
+      alert("Account created successfully!");
 
       // Redirect to home (inside tabs)
       router.replace("/(tabs)/home");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      
+      // Handle specific Firebase auth errors
+      let errorMessage = 'Account creation failed';
+      
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = 'This email is already registered. Please sign in instead.';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Please enter a valid email address.';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'Password should be at least 6 characters long.';
+            break;
+          case 'auth/network-request-failed':
+            errorMessage = 'Network error. Please check your internet connection.';
+            break;
+          default:
+            errorMessage = error.message || 'Account creation failed';
+        }
+      }
+      
+      alert(errorMessage);
     }
   };
 
