@@ -47,4 +47,5 @@ export const LS_KEYS = {
   USER_PROFILES: 'userProfiles',
   EVENTS: 'events',
   SAVED_EVENTS: (uid: string) => `savedEvents:${uid}`,
+  EVENT_POLICY: 'eventPolicy',
 } as const;
