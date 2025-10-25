@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useAuthUser } from '../hooks/useAuthUser';
 import { getLS, LS_KEYS } from '../lib/localStorage';
+import { validateEventInput, getDefaultDenylist } from '../lib/eventValidators';
 import { createEvent } from '../services/eventsService';
 import { Club } from '../types';
 
@@ -32,6 +33,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   const [date, setDate] = useState('');
   const [location, setLocation] = useState('');
   const [loading, setLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     loadClubs();
@@ -53,14 +55,18 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
       return;
     }
 
+    // Clear previous validation errors
+    setValidationErrors([]);
+
+    // Basic field validation
     if (!selectedClubId || !title.trim() || !description.trim() || !date.trim() || !location.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setValidationErrors(['Please fill in all fields']);
       return;
     }
 
     // Check if user is a member of the selected club
     if (!profile.memberships.includes(selectedClubId)) {
-      Alert.alert('Error', 'You must be a member of this club to create events');
+      setValidationErrors(['You must be a member of this club to create events']);
       return;
     }
 
@@ -69,10 +75,32 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
       // Convert date to ISO format
       const eventDate = new Date(date);
       if (isNaN(eventDate.getTime())) {
-        Alert.alert('Error', 'Please enter a valid date');
+        setValidationErrors(['Please enter a valid date']);
+        setLoading(false);
         return;
       }
 
+      // Run comprehensive validation
+      const denylist = getDefaultDenylist();
+      const validation = await validateEventInput(
+        {
+          title: title.trim(),
+          description: description.trim(),
+          clubId: selectedClubId,
+          dateISO: eventDate.toISOString(),
+          location: location.trim(),
+        },
+        user.uid,
+        denylist
+      );
+
+      if (!validation.ok) {
+        setValidationErrors(validation.errors);
+        setLoading(false);
+        return;
+      }
+
+      // If validation passes, create the event
       await createEvent(
         {
           title: title.trim(),
@@ -92,7 +120,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
       ]);
     } catch (error) {
       console.error('Error creating event:', error);
-      Alert.alert('Error', 'Failed to create event');
+      setValidationErrors(['Failed to create event']);
     } finally {
       setLoading(false);
     }
@@ -221,6 +249,17 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
                 maxLength={100}
               />
             </View>
+
+            {/* Validation Errors */}
+            {validationErrors.length > 0 && (
+              <View style={styles.errorContainer}>
+                {validationErrors.map((error, index) => (
+                  <Text key={index} style={styles.errorText}>
+                    • {error}
+                  </Text>
+                ))}
+              </View>
+            )}
 
             <TouchableOpacity
               style={[styles.createButton, loading && styles.buttonDisabled]}
@@ -379,5 +418,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  errorContainer: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 14,
+    marginBottom: 4,
   },
 });
