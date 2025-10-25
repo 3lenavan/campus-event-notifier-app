@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
 import { getLS, LS_KEYS } from "../../src/lib/localStorage";
+import { isCreationEnabledForClub, getEventPolicy } from "../../src/lib/eventPolicy";
 import { listEvents } from "../../src/services/eventsService";
 import { Club } from "../../src/types";
 import EventCard from "../event-card";
@@ -43,6 +44,10 @@ export default function Discover() {
   // Load events from Local Storage
   const [events, setEvents] = useState<LegacyEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  
+  // Event policy state
+  const [eventPolicy, setEventPolicy] = useState<any>(null);
+  const [canCreateEvents, setCanCreateEvents] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -95,6 +100,43 @@ export default function Discover() {
     fetchClubs();
   }, []);
 
+  // Load event policy
+  useEffect(() => {
+    const loadEventPolicy = async () => {
+      try {
+        const policy = await getEventPolicy();
+        setEventPolicy(policy);
+      } catch (error) {
+        console.error("Error loading event policy:", error);
+      }
+    };
+
+    loadEventPolicy();
+  }, []);
+
+  // Check creation permissions for all clubs when profile or policy changes
+  useEffect(() => {
+    const checkCreationPermissions = async () => {
+      if (!profile || !clubs.length) return;
+      
+      const permissions: Record<string, boolean> = {};
+      
+      for (const club of clubs) {
+        try {
+          const canCreate = await canCreateEvent(club.id);
+          permissions[club.id] = canCreate;
+        } catch (error) {
+          console.error(`Error checking permissions for club ${club.id}:`, error);
+          permissions[club.id] = false;
+        }
+      }
+      
+      setCanCreateEvents(permissions);
+    };
+
+    checkCreationPermissions();
+  }, [profile, clubs, eventPolicy]);
+
   // Filters club list by search input
   const filteredClubs = clubs.filter(
     (club) =>
@@ -112,8 +154,20 @@ export default function Discover() {
       );
 
   // Check if user can create events for a club
-  const canCreateEvent = (clubId: string) => {
-    return profile?.role === 'member' && profile?.memberships.includes(clubId);
+  const canCreateEvent = async (clubId: string) => {
+    // Basic membership check
+    if (!profile || profile.role !== 'member' || !profile.memberships.includes(clubId)) {
+      return false;
+    }
+    
+    // Check if event creation is enabled for this club
+    try {
+      const isEnabled = await isCreationEnabledForClub(clubId);
+      return isEnabled;
+    } catch (error) {
+      console.error('Error checking event creation policy:', error);
+      return false;
+    }
   };
 
   // Toggles club expand/collapse
@@ -240,8 +294,8 @@ export default function Discover() {
                       </Text>
                     </View>
 
-                    {/* Create Event Button - only show if user is a member */}
-                    {canCreateEvent(club.id) && (
+                    {/* Create Event Button - only show if user can create events */}
+                    {canCreateEvents[club.id] && (
                       <TouchableOpacity
                         style={styles.createEventButton}
                         onPress={() => router.push({
@@ -250,7 +304,11 @@ export default function Discover() {
                         })}
                       >
                         <Ionicons name="add-circle" size={16} color="#3B82F6" />
-                        <Text style={styles.createEventButtonText}>Create Event</Text>
+                        <Text style={styles.createEventButtonText}>
+                          {eventPolicy?.moderationMode !== "off" 
+                            ? "Submit Event (goes to review)" 
+                            : "Create Event"}
+                        </Text>
                       </TouchableOpacity>
                     )}
                   </View>
