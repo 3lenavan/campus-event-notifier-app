@@ -4,6 +4,8 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { useColorScheme } from "react-native";
 import { seedClubsOnce } from "../src/bootstrap/seedClubs";
+import { initializeNotifications } from "../src/lib/notifications";
+import { useAuthUser } from "../src/hooks/useAuthUser";
 
 const LightTheme = {
   ...DefaultTheme,
@@ -33,6 +35,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? DarkThemeCustom : LightTheme;
+  const { user } = useAuthUser();
 
   // Initialize app data on startup
   useEffect(() => {
@@ -48,6 +51,13 @@ export default function RootLayout() {
 
     initializeApp();
   }, []);
+
+  // Initialize notifications when user is available
+  useEffect(() => {
+    if (user?.uid) {
+      initializeNotifications(user.uid);
+    }
+  }, [user?.uid]);
 
   return (
     <ThemeProvider value={theme}>
