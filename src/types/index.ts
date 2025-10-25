@@ -25,6 +25,8 @@ export interface Event {
   location: string;
   createdBy: string; // User UID
   createdAt: number; // Timestamp
+  status: "pending" | "approved" | "rejected";
+  moderationNote?: string; // Optional note from moderator
 }
 
 // Service Types

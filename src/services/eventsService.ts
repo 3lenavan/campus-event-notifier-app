@@ -1,4 +1,5 @@
 import { getLS, LS_KEYS, setLS } from '../lib/localStorage';
+import { getEventPolicy } from '../lib/eventPolicy';
 import { CreateEventInput, Event } from '../types';
 
 /**
@@ -17,6 +18,21 @@ export const listEvents = async (): Promise<Event[]> => {
     return events.sort((a, b) => b.createdAt - a.createdAt);
   } catch (error) {
     console.error('Error listing events:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get all approved events sorted by creation date (newest first)
+ */
+export const listApprovedEvents = async (): Promise<Event[]> => {
+  try {
+    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
+    return events
+      .filter(event => event.status === "approved")
+      .sort((a, b) => b.createdAt - a.createdAt);
+  } catch (error) {
+    console.error('Error listing approved events:', error);
     throw error;
   }
 };
@@ -43,6 +59,10 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
   try {
     const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
     
+    // Get event policy to determine status
+    const eventPolicy = await getEventPolicy();
+    const status = eventPolicy.moderationMode === "off" ? "approved" : "pending";
+    
     const newEvent: Event = {
       id: generateEventId(),
       title: eventInput.title,
@@ -52,6 +72,7 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
       location: eventInput.location,
       createdBy,
       createdAt: Date.now(),
+      status,
     };
 
     // Add to events array
@@ -105,6 +126,70 @@ export const unsaveEvent = async (uid: string, eventId: string): Promise<void> =
     await setLS(LS_KEYS.SAVED_EVENTS(uid), filteredEvents);
   } catch (error) {
     console.error('Error unsaving event:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get pending events for a specific club
+ */
+export const getPendingEvents = async (clubId: string): Promise<Event[]> => {
+  try {
+    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
+    return events
+      .filter(event => event.clubId === clubId && event.status === "pending")
+      .sort((a, b) => b.createdAt - a.createdAt);
+  } catch (error) {
+    console.error('Error getting pending events:', error);
+    throw error;
+  }
+};
+
+/**
+ * Approve an event
+ */
+export const approveEvent = async (eventId: string): Promise<void> => {
+  try {
+    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
+    const eventIndex = events.findIndex(event => event.id === eventId);
+    
+    if (eventIndex === -1) {
+      throw new Error('Event not found');
+    }
+    
+    events[eventIndex] = {
+      ...events[eventIndex],
+      status: "approved"
+    };
+    
+    await setLS(LS_KEYS.EVENTS, events);
+  } catch (error) {
+    console.error('Error approving event:', error);
+    throw error;
+  }
+};
+
+/**
+ * Reject an event with a moderation note
+ */
+export const rejectEvent = async (eventId: string, moderationNote: string): Promise<void> => {
+  try {
+    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
+    const eventIndex = events.findIndex(event => event.id === eventId);
+    
+    if (eventIndex === -1) {
+      throw new Error('Event not found');
+    }
+    
+    events[eventIndex] = {
+      ...events[eventIndex],
+      status: "rejected",
+      moderationNote
+    };
+    
+    await setLS(LS_KEYS.EVENTS, events);
+  } catch (error) {
+    console.error('Error rejecting event:', error);
     throw error;
   }
 };

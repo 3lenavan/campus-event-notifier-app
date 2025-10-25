@@ -10,10 +10,11 @@ import {
     View,
 } from "react-native";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
+import { getEventPolicy, isCreationEnabledForClub } from "../../src/lib/eventPolicy";
 import { getLS, LS_KEYS } from "../../src/lib/localStorage";
-import { isCreationEnabledForClub, getEventPolicy } from "../../src/lib/eventPolicy";
-import { listEvents } from "../../src/services/eventsService";
+import { listApprovedEvents } from "../../src/services/eventsService";
 import { Club } from "../../src/types";
+import { ClubModerationPanel } from "../../src/components";
 import EventCard from "../event-card";
 
 // Legacy event interface for compatibility with existing EventCard component
@@ -48,11 +49,15 @@ export default function Discover() {
   // Event policy state
   const [eventPolicy, setEventPolicy] = useState<any>(null);
   const [canCreateEvents, setCanCreateEvents] = useState<Record<string, boolean>>({});
+  
+  // Moderation panel state
+  const [showModerationPanel, setShowModerationPanel] = useState(false);
+  const [selectedClubForModeration, setSelectedClubForModeration] = useState<Club | null>(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const eventsData = await listEvents();
+        const eventsData = await listApprovedEvents();
         // Convert new Event format to legacy format for EventCard compatibility
         const legacyEvents: LegacyEvent[] = eventsData.map(event => ({
           id: event.id,
@@ -181,6 +186,17 @@ export default function Discover() {
 
   const isClubExpanded = (clubId: string) => expandedClubs.has(clubId);
 
+  // Handle moderation panel
+  const openModerationPanel = (club: Club) => {
+    setSelectedClubForModeration(club);
+    setShowModerationPanel(true);
+  };
+
+  const closeModerationPanel = () => {
+    setShowModerationPanel(false);
+    setSelectedClubForModeration(null);
+  };
+
   // Assigns colors to category tags
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
@@ -214,6 +230,28 @@ export default function Discover() {
   // Main content
   return (
     <View style={styles.container}>
+      {/* Moderation Panel */}
+      {showModerationPanel && selectedClubForModeration && (
+        <View style={styles.moderationPanelOverlay}>
+          <View style={styles.moderationPanel}>
+            <View style={styles.moderationPanelHeader}>
+              <Text style={styles.moderationPanelTitle}>
+                Moderate {selectedClubForModeration.name}
+              </Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={closeModerationPanel}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ClubModerationPanel
+              clubId={selectedClubForModeration.id}
+              clubName={selectedClubForModeration.name}
+            />
+          </View>
+        </View>
+      )}
       {/* Header section */}
       <View style={styles.header}>
         <View>
@@ -294,23 +332,39 @@ export default function Discover() {
                       </Text>
                     </View>
 
-                    {/* Create Event Button - only show if user can create events */}
-                    {canCreateEvents[club.id] && (
-                      <TouchableOpacity
-                        style={styles.createEventButton}
-                        onPress={() => router.push({
-                          pathname: '/create-event',
-                          params: { clubId: club.id }
-                        })}
-                      >
-                        <Ionicons name="add-circle" size={16} color="#3B82F6" />
-                        <Text style={styles.createEventButtonText}>
-                          {eventPolicy?.moderationMode !== "off" 
-                            ? "Submit Event (goes to review)" 
-                            : "Create Event"}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                    {/* Action Buttons */}
+                    <View style={styles.actionButtonsContainer}>
+                      {/* Create Event Button - only show if user can create events */}
+                      {canCreateEvents[club.id] && (
+                        <TouchableOpacity
+                          style={styles.createEventButton}
+                          onPress={() => router.push({
+                            pathname: '/create-event',
+                            params: { clubId: club.id }
+                          })}
+                        >
+                          <Ionicons name="add-circle" size={16} color="#3B82F6" />
+                          <Text style={styles.createEventButtonText}>
+                            {eventPolicy?.moderationMode !== "off" 
+                              ? "Submit Event (goes to review)" 
+                              : "Create Event"}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      
+                      {/* Moderation Button - only show if user is a member and moderation is enabled */}
+                      {profile?.role === 'member' && 
+                       profile?.memberships.includes(club.id) && 
+                       eventPolicy?.moderationMode !== "off" && (
+                        <TouchableOpacity
+                          style={styles.moderationButton}
+                          onPress={() => openModerationPanel(club)}
+                        >
+                          <Ionicons name="shield-checkmark" size={16} color="#8B5CF6" />
+                          <Text style={styles.moderationButtonText}>Moderate</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 </View>
 
@@ -439,6 +493,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
   },
+  actionButtonsContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+    flexWrap: "wrap",
+  },
   createEventButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -446,11 +506,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    marginTop: 8,
     alignSelf: "flex-start",
   },
   createEventButtonText: {
     color: "#3B82F6",
+    fontSize: 12,
+    fontWeight: "500",
+    marginLeft: 4,
+  },
+  moderationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3E8FF",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: "flex-start",
+  },
+  moderationButtonText: {
+    color: "#8B5CF6",
     fontSize: 12,
     fontWeight: "500",
     marginLeft: 4,
@@ -471,5 +545,42 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "500",
     marginLeft: 2,
+  },
+  moderationPanelOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    zIndex: 1000,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  moderationPanel: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    width: "90%",
+    height: "80%",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  moderationPanelHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  moderationPanelTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#111827",
+  },
+  closeButton: {
+    padding: 4,
   },
 });
