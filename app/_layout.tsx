@@ -66,14 +66,6 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen 
-          name="login" 
-          options={{ 
-            title: "Sign In",
-            headerShown: true,
-            presentation: "modal"
-          }} 
-        />
-        <Stack.Screen 
           name="verify-club" 
           options={{ 
             title: "Verify Club Membership",
@@ -82,9 +74,33 @@ export default function RootLayout() {
           }} 
         />
         <Stack.Screen 
-          name="create-event" 
+          name="settings" 
           options={{ 
-            title: "Create Event",
+            title: "Settings",
+            headerShown: true,
+            presentation: "modal"
+          }} 
+        />
+        <Stack.Screen 
+          name="signup" 
+          options={{ 
+            title: "Sign Up",
+            headerShown: true,
+            presentation: "modal"
+          }} 
+        />
+        <Stack.Screen 
+          name="update-email" 
+          options={{ 
+            title: "Update Email",
+            headerShown: true,
+            presentation: "modal"
+          }} 
+        />
+        <Stack.Screen 
+          name="update-password" 
+          options={{ 
+            title: "Update Password",
             headerShown: true,
             presentation: "modal"
           }} 
