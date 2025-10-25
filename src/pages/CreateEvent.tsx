@@ -13,6 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuthUser } from '../hooks/useAuthUser';
 import { getLS, LS_KEYS } from '../lib/localStorage';
 import { validateEventInput, getDefaultDenylist } from '../lib/eventValidators';
@@ -30,10 +31,12 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   const [selectedClubId, setSelectedClubId] = useState(clubId || '');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState('');
+  const [eventDate, setEventDate] = useState(new Date());
   const [location, setLocation] = useState('');
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   useEffect(() => {
     loadClubs();
@@ -49,6 +52,24 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     }
   };
 
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setEventDate(selectedDate);
+    }
+  };
+
+  const handleTimeChange = (event: any, selectedDate?: Date) => {
+    setShowTimePicker(false);
+    if (selectedDate) {
+      setEventDate(selectedDate);
+    }
+  };
+
+  const formatDateTime = (date: Date) => {
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   const handleCreateEvent = async () => {
     if (!user || !profile) {
       Alert.alert('Error', 'Please sign in first');
@@ -59,7 +80,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     setValidationErrors([]);
 
     // Basic field validation
-    if (!selectedClubId || !title.trim() || !description.trim() || !date.trim() || !location.trim()) {
+    if (!selectedClubId || !title.trim() || !description.trim() || !location.trim()) {
       setValidationErrors(['Please fill in all fields']);
       return;
     }
@@ -72,14 +93,6 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
     setLoading(true);
     try {
-      // Convert date to ISO format
-      const eventDate = new Date(date);
-      if (isNaN(eventDate.getTime())) {
-        setValidationErrors(['Please enter a valid date']);
-        setLoading(false);
-        return;
-      }
-
       // Run comprehensive validation
       const denylist = getDefaultDenylist();
       const validation = await validateEventInput(
@@ -228,14 +241,30 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Date & Time *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="YYYY-MM-DD HH:MM (e.g., 2024-12-25 14:30)"
-                value={date}
-                onChangeText={setDate}
-              />
+              <View style={styles.dateTimeContainer}>
+                <TouchableOpacity
+                  style={styles.dateTimeButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#6B7280" />
+                  <Text style={styles.dateTimeText}>
+                    {eventDate.toLocaleDateString()}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color="#6B7280" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.dateTimeButton, styles.timeButton]}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={20} color="#6B7280" />
+                  <Text style={styles.dateTimeText}>
+                    {eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
               <Text style={styles.helpText}>
-                Format: YYYY-MM-DD HH:MM (24-hour format)
+                Tap to select date and time
               </Text>
             </View>
 
@@ -278,6 +307,27 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={eventDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {/* Time Picker */}
+      {showTimePicker && (
+        <DateTimePicker
+          value={eventDate}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleTimeChange}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -431,5 +481,28 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: 14,
     marginBottom: 4,
+  },
+  dateTimeContainer: {
+    marginBottom: 4,
+    gap: 8,
+  },
+  dateTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  timeButton: {
+    marginTop: 8,
+  },
+  dateTimeText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#111827',
+    marginLeft: 12,
   },
 });
