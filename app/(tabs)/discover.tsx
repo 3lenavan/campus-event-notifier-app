@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import React, { useState, useEffect } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../FirebaseConfig";
-
 import {
   View,
   Text,
@@ -12,9 +11,8 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import EventCard from "../event-card"; // make sure this path is correct
 
-// Club data structure
+// Firestore data structure
 interface Club {
   id: string;
   name: string;
@@ -23,104 +21,65 @@ interface Club {
   imageUrl?: string;
 }
 
-// Event data structure
 interface Event {
   id: string;
   title: string;
-  description: string;
-  date: string;
-  time: string;
-  location: string;
-  category: string;
-  attendees: number;
-  maxAttendees?: number;
-  imageUrl?: string;
-  isUserAttending?: boolean;
   clubId: string;
-  clubName: string;
+  date: string;
 }
 
 export default function Discover() {
   const router = useRouter();
 
-  // Search + expand state
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedClubs, setExpandedClubs] = useState<Set<string>>(new Set());
-
-  // Load events from Firestore
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
-
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "events"));
-        const eventData = querySnapshot.docs.map((doc) => ({
-          ...(doc.data() as Event),
-          id: doc.id, // attach Firestore document ID
-        }));
-        setEvents(eventData);
-      } catch (error) {
-        console.error("Error fetching events:", error);
-      } finally {
-        setLoadingEvents(false);
-      }
-    };
-
-    fetchEvents();
-  }, []);
-
-  // Load clubs from Firestore
   const [clubs, setClubs] = useState<Club[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // ✅ Fetch clubs and events from Firestore
   useEffect(() => {
-    const fetchClubs = async () => {
+    const fetchData = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "clubs"));
-        const clubData = querySnapshot.docs.map((doc) => ({
-          ...(doc.data() as Club),
-          id: doc.id,
-        })) as Club[];
+        // Fetch clubs
+        const clubSnap = await getDocs(collection(db, "clubs"));
+        const clubData = clubSnap.docs.map((doc) => {
+          const data = doc.data() as Club;
+          const { id: _, ...rest } = data; // remove Firestore id if stored in doc
+          return { id: doc.id, ...rest };
+        });
+
+        // Fetch events
+        const eventSnap = await getDocs(collection(db, "events"));
+        const eventData = eventSnap.docs.map((doc) => {
+          const data = doc.data() as Event;
+          const { id: _, ...rest } = data;
+          return { id: doc.id, ...rest };
+        });
+
         setClubs(clubData);
+        setEvents(eventData);
       } catch (error) {
-        console.error("Error fetching clubs:", error);
+        console.error("Error loading clubs/events:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchClubs();
+    fetchData();
   }, []);
 
-  // Filters club list by search input
+  // Filter clubs by search
   const filteredClubs = clubs.filter(
     (club) =>
       club.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       club.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Groups and sorts events by club
-  const getClubEvents = (clubId: string) =>
-    events
-      .filter((event) => event.clubId === clubId)
-      .filter((event) => new Date(event.date) >= new Date()) // only future events
-      .sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
+  // Count upcoming events per club
+  const getEventCount = (clubId: string) =>
+    events.filter((event) => event.clubId === clubId).length;
 
-  // Toggles club expand/collapse
-  const toggleClubExpansion = (clubId: string) => {
-    const newExpanded = new Set(expandedClubs);
-    newExpanded.has(clubId)
-      ? newExpanded.delete(clubId)
-      : newExpanded.add(clubId);
-    setExpandedClubs(newExpanded);
-  };
-
-  const isClubExpanded = (clubId: string) => expandedClubs.has(clubId);
-
-  // Assigns colors to category tags
+  // Category color helper
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
       Academic: "#3B82F6",
@@ -133,7 +92,7 @@ export default function Discover() {
     return colors[category] || colors["Other"];
   };
 
-  // Loading placeholders while Firestore data loads
+  // Loading state
   if (loading) {
     return (
       <View style={styles.center}>
@@ -142,26 +101,18 @@ export default function Discover() {
     );
   }
 
-  if (loadingEvents) {
-    return (
-      <View style={styles.center}>
-        <Text style={{ color: "#6B7280" }}>Loading events...</Text>
-      </View>
-    );
-  }
-
-  // Main content
+  // Main UI
   return (
     <View style={styles.container}>
-      {/* Header section */}
+      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Discover</Text>
-          <Text style={styles.headerSubtitle}>Find clubs and events</Text>
+          <Text style={styles.headerSubtitle}>Find clubs and organizations</Text>
         </View>
       </View>
 
-      {/* Search bar */}
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons
           name="search-outline"
@@ -177,7 +128,7 @@ export default function Discover() {
         />
       </View>
 
-      {/* Club list */}
+      {/* Clubs List */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {filteredClubs.length === 0 ? (
           <View style={styles.emptyState}>
@@ -185,93 +136,55 @@ export default function Discover() {
             <Text style={styles.emptySubText}>Try a different search term</Text>
           </View>
         ) : (
-          filteredClubs.map((club) => {
-            const clubEvents = getClubEvents(club.id);
-            const expanded = isClubExpanded(club.id);
-            const eventsToShow = expanded ? clubEvents : clubEvents.slice(0, 3);
-            const hasMore = clubEvents.length > 3;
-
-            return (
-              <View key={club.id} style={styles.clubCard}>
-                <View style={styles.clubHeader}>
-                  <View
-                    style={[
-                      styles.clubIcon,
-                      { backgroundColor: getCategoryColor(club.category) },
-                    ]}
-                  >
-                    <Text style={styles.clubIconText}>{club.name[0]}</Text>
-                  </View>
-
-                  <View style={styles.clubInfo}>
-                    <Text style={styles.clubName}>{club.name}</Text>
-                    <Text style={styles.clubDescription}>
-                      {club.description}
-                    </Text>
-
-                    <View style={styles.badgeRow}>
-                      <View
-                        style={[
-                          styles.categoryBadge,
-                          { backgroundColor: getCategoryColor(club.category) },
-                        ]}
-                      >
-                        <Text style={styles.categoryText}>{club.category}</Text>
-                      </View>
-                      <Text style={styles.eventCount}>
-                        {clubEvents.length} upcoming event
-                        {clubEvents.length !== 1 ? "s" : ""}
-                      </Text>
-                    </View>
-                  </View>
+          filteredClubs.map((club) => (
+            <TouchableOpacity
+              key={club.id}
+              style={styles.clubCard}
+              onPress={() =>
+                router.push({
+                  pathname: "/club-details-screen",
+                  params: { id: club.id },
+                })
+              }
+            >
+              <View style={styles.clubHeader}>
+                <View
+                  style={[
+                    styles.clubIcon,
+                    { backgroundColor: getCategoryColor(club.category) },
+                  ]}
+                >
+                  <Text style={styles.clubIconText}>
+                    {club.name[0].toUpperCase()}
+                  </Text>
                 </View>
 
-                {/* Club events preview */}
-                {clubEvents.length > 0 ? (
-                  <View style={styles.eventList}>
-                    {eventsToShow.map((event) => (
-                      <EventCard
-                        key={event.id}
-                        event={event}
-                        onPress={() =>
-                          router.push({
-                            pathname: "/event-details-screen",
-                            params: { id: event.id },
-                          })
-                        }
-                      />
-                    ))}
+                <View style={styles.clubInfo}>
+                  <Text style={styles.clubName}>{club.name}</Text>
+                  <Text style={styles.clubDescription}>
+                    {club.description.length > 80
+                      ? club.description.substring(0, 80) + "..."
+                      : club.description}
+                  </Text>
 
-                    {/* Show more / less */}
-                    {hasMore && (
-                      <TouchableOpacity
-                        style={styles.showMoreButton}
-                        onPress={() => toggleClubExpansion(club.id)}
-                      >
-                        <Text style={styles.showMoreText}>
-                          {expanded
-                            ? "Show Less"
-                            : `Show ${clubEvents.length - 3} More`}
-                        </Text>
-                        <Ionicons
-                          name={
-                            expanded
-                              ? "chevron-up-outline"
-                              : "chevron-down-outline"
-                          }
-                          size={16}
-                          color="#555"
-                          style={{ marginLeft: 4 }}
-                        />
-                      </TouchableOpacity>
-                    )}
+                  <View style={styles.badgeRow}>
+                    <View
+                      style={[
+                        styles.categoryBadge,
+                        { backgroundColor: getCategoryColor(club.category) },
+                      ]}
+                    >
+                      <Text style={styles.categoryText}>{club.category}</Text>
+                    </View>
+                    <Text style={styles.eventCount}>
+                      {getEventCount(club.id)} upcoming event
+                      {getEventCount(club.id) !== 1 ? "s" : ""}
+                    </Text>
                   </View>
-                ) : (
-                  <Text style={styles.noEventsText}>No upcoming events</Text>
-                )}
+                </View>
               </View>
-            );
-          })
+            </TouchableOpacity>
+          ))
         )}
       </ScrollView>
     </View>
@@ -293,7 +206,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: "bold" },
   headerSubtitle: { fontSize: 13, color: "#6B7280" },
-
   searchContainer: { marginHorizontal: 16, marginTop: 8, marginBottom: 4 },
   input: {
     backgroundColor: "white",
@@ -306,7 +218,7 @@ const styles = StyleSheet.create({
   searchIcon: { position: "absolute", left: 10, top: 10 },
   scrollContent: { padding: 16, paddingBottom: 100 },
   emptyState: { alignItems: "center", marginTop: 60 },
-  emptyText: { color: "#6B7280" },
+  emptyText: { color: "#6B7280", fontSize: 15 },
   emptySubText: { fontSize: 12, color: "#9CA3AF", marginTop: 4 },
   clubCard: {
     backgroundColor: "white",
@@ -337,18 +249,4 @@ const styles = StyleSheet.create({
   },
   categoryText: { color: "white", fontSize: 11 },
   eventCount: { fontSize: 12, color: "#6B7280", marginLeft: 6 },
-  eventList: { marginTop: 10 },
-  showMoreButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-  },
-  showMoreText: { color: "#3B82F6", fontSize: 13 },
-  noEventsText: {
-    textAlign: "center",
-    color: "#9CA3AF",
-    marginTop: 8,
-    fontSize: 13,
-  },
 });
