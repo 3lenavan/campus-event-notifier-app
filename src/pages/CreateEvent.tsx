@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -13,10 +14,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuthUser } from '../hooks/useAuthUser';
+import { getDefaultDenylist, validateEventInput } from '../lib/eventValidators';
 import { getLS, LS_KEYS } from '../lib/localStorage';
-import { validateEventInput, getDefaultDenylist } from '../lib/eventValidators';
 import { createEvent } from '../services/eventsService';
 import { Club } from '../types';
 
@@ -33,6 +33,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   const [description, setDescription] = useState('');
   const [eventDate, setEventDate] = useState(new Date());
   const [location, setLocation] = useState('');
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -41,6 +42,15 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   useEffect(() => {
     loadClubs();
   }, []);
+
+  // If clubs load and user has memberships, preselect first club
+  useEffect(() => {
+    if (!profile) return;
+    const eligible = clubs.filter(c => profile.memberships.includes(c.id));
+    if (eligible.length > 0 && !selectedClubId) {
+      setSelectedClubId(eligible[0].id);
+    }
+  }, [clubs, profile]);
 
   const loadClubs = async () => {
     try {
@@ -66,6 +76,26 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     }
   };
 
+  const pickerColor = '#000000';
+
+  const toTitleCase = (value: string) =>
+    value.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase());
+
+  // Enforce location format: "Building - Room 123"
+  const LOCATION_REGEX = /^.+\s-\sRoom\s\d+$/;
+
+  const handleLocationChange = (value: string) => {
+    const formatted = toTitleCase(value);
+    setLocation(formatted);
+    if (formatted.length === 0) {
+      setLocationError(null);
+    } else if (!LOCATION_REGEX.test(formatted)) {
+      setLocationError("Use format: Building - Room 123");
+    } else {
+      setLocationError(null);
+    }
+  };
+
   const formatDateTime = (date: Date) => {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -77,11 +107,18 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     }
 
     // Clear previous validation errors
-    setValidationErrors([]);
+    const errors: string[] = [];
 
-    // Basic field validation
-    if (!selectedClubId || !title.trim() || !description.trim() || !location.trim()) {
-      setValidationErrors(['Please fill in all fields']);
+    if (!selectedClubId) errors.push('Please select a club');
+    if (!title.trim()) errors.push('Please enter a title');
+    if (!description.trim()) errors.push('Please enter a description');
+    if (!location.trim()) errors.push('Please enter a location');
+    if (location.trim() && !LOCATION_REGEX.test(location.trim())) {
+      errors.push("Location must match 'Building - Room 123'");
+    }
+
+    if (errors.length) {
+      setValidationErrors(errors);
       return;
     }
 
@@ -246,21 +283,21 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
                   style={styles.dateTimeButton}
                   onPress={() => setShowDatePicker(true)}
                 >
-                  <Ionicons name="calendar-outline" size={20} color="#6B7280" />
+                  <Ionicons name="calendar-outline" size={20} color={pickerColor} />
                   <Text style={styles.dateTimeText}>
                     {eventDate.toLocaleDateString()}
                   </Text>
-                  <Ionicons name="chevron-down" size={20} color="#6B7280" />
+                  <Ionicons name="chevron-down" size={20} color={pickerColor} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.dateTimeButton, styles.timeButton]}
                   onPress={() => setShowTimePicker(true)}
                 >
-                  <Ionicons name="time-outline" size={20} color="#6B7280" />
+                  <Ionicons name="time-outline" size={20} color={pickerColor} />
                   <Text style={styles.dateTimeText}>
                     {eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Text>
-                  <Ionicons name="chevron-down" size={20} color="#6B7280" />
+                  <Ionicons name="chevron-down" size={20} color={pickerColor} />
                 </TouchableOpacity>
               </View>
               <Text style={styles.helpText}>
@@ -272,11 +309,14 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
               <Text style={styles.label}>Location *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Event location"
+                placeholder="Building - Room 123"
                 value={location}
-                onChangeText={setLocation}
+                onChangeText={handleLocationChange}
                 maxLength={100}
               />
+              {locationError && (
+                <Text style={[styles.helpText, { color: '#DC2626' }]}>{locationError}</Text>
+              )}
             </View>
 
             {/* Validation Errors */}
@@ -316,6 +356,8 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={handleDateChange}
           minimumDate={new Date()}
+          themeVariant="light"
+          {...(Platform.OS === 'ios' ? { textColor: '#000000' as any } : {})}
         />
       )}
 
@@ -326,6 +368,8 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
           mode="time"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={handleTimeChange}
+          themeVariant="light"
+          {...(Platform.OS === 'ios' ? { textColor: '#000000' as any } : {})}
         />
       )}
     </KeyboardAvoidingView>

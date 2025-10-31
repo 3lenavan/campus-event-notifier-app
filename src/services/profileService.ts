@@ -25,22 +25,23 @@ export const upsertProfileFromAuth = async (user: User): Promise<UserProfile> =>
     const userProfiles = await getLS<Record<string, UserProfile>>(LS_KEYS.USER_PROFILES, {});
     
     let profile = userProfiles[user.uid];
+    const emailNormalized = (user.email || '').trim().toLowerCase();
     
     if (!profile) {
       // Create new profile for first-time user
       profile = {
         uid: user.uid,
         name: user.displayName || user.email?.split('@')[0] || 'Unknown User',
-        email: user.email || '',
+        email: emailNormalized,
         role: 'student',
         memberships: [],
-        isAdmin: ADMIN_EMAILS.includes(user.email || ''),
+        isAdmin: ADMIN_EMAILS.includes(emailNormalized),
       };
     } else {
       // Update existing profile with latest auth data
       profile.name = user.displayName || profile.name;
-      profile.email = user.email || profile.email;
-      profile.isAdmin = ADMIN_EMAILS.includes(user.email || '');
+      profile.email = emailNormalized || profile.email;
+      profile.isAdmin = ADMIN_EMAILS.includes(emailNormalized);
     }
     
     // Save back to Local Storage

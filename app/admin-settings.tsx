@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuthUser } from '../src/hooks/useAuthUser';
+import { EventPolicy, getEventPolicy, setEventPolicy } from '../src/lib/eventPolicy';
 import { listClubs, updateClubCodes } from '../src/services/clubsService';
 import { approveEvent, listEvents, rejectEvent } from '../src/services/eventsService';
 import { Club, Event } from '../src/types';
@@ -19,6 +20,8 @@ export default function AdminSettings() {
   const [newMemberCode, setNewMemberCode] = useState('');
   const [newModeratorCode, setNewModeratorCode] = useState('');
   const [savingCodes, setSavingCodes] = useState(false);
+  const [policy, setPolicy] = useState<EventPolicy | null>(null);
+  const [policyLoading, setPolicyLoading] = useState(true);
 
   useEffect(() => {
     if (!profile?.isAdmin) return;
@@ -28,10 +31,12 @@ export default function AdminSettings() {
   const reload = async () => {
     setEventsLoading(true);
     setClubsLoading(true);
+    setPolicyLoading(true);
     try {
-      const [events, clubsList] = await Promise.all([listEvents(), listClubs()]);
+      const [events, clubsList, currentPolicy] = await Promise.all([listEvents(), listClubs(), getEventPolicy()]);
       setAllEvents(events || []);
       setClubs(clubsList || []);
+      setPolicy(currentPolicy);
       if (clubsList && clubsList.length > 0) {
         setSelectedClubId(clubsList[0].id);
       }
@@ -40,6 +45,7 @@ export default function AdminSettings() {
     } finally {
       setEventsLoading(false);
       setClubsLoading(false);
+      setPolicyLoading(false);
     }
   };
 
@@ -51,6 +57,18 @@ export default function AdminSettings() {
       setAllEvents(prev => prev.map(e => (e.id === eventId ? { ...e, status: 'approved' } : e)));
     } catch (e) {
       Alert.alert('Error', 'Failed to approve event');
+    }
+  };
+
+  const toggleModeration = async (mode: 'off' | 'clubModerator') => {
+    if (!policy) return;
+    try {
+      const next = { ...policy, moderationMode: mode } as EventPolicy;
+      await setEventPolicy(next);
+      setPolicy(next);
+      Alert.alert('Success', mode === 'off' ? 'Auto-approve enabled' : 'Approval required');
+    } catch {
+      Alert.alert('Error', 'Failed to update moderation mode');
     }
   };
 
@@ -108,6 +126,33 @@ export default function AdminSettings() {
         <Text style={styles.backText}>Back</Text>
       </TouchableOpacity>
       <Text style={styles.header}>Admin Settings</Text>
+
+      <View style={[styles.card, styles.cardSpacing]}>
+        <Text style={styles.title}>Moderation</Text>
+        {policyLoading || !policy ? (
+          <ActivityIndicator />
+        ) : (
+          <>
+            <Text style={styles.subtitle}>
+              Current mode: {policy.moderationMode === 'off' ? 'Auto-approve' : 'Require approval'}
+            </Text>
+            <View style={styles.toggleRow}>
+              <TouchableOpacity
+                style={[styles.toggleBtn, policy.moderationMode === 'off' && styles.toggleBtnActive]}
+                onPress={() => toggleModeration('off')}
+              >
+                <Text style={[styles.toggleText, policy.moderationMode === 'off' && styles.toggleTextActive]}>Auto-approve</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleBtn, policy.moderationMode === 'clubModerator' && styles.toggleBtnActive]}
+                onPress={() => toggleModeration('clubModerator')}
+              >
+                <Text style={[styles.toggleText, policy.moderationMode === 'clubModerator' && styles.toggleTextActive]}>Require approval</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
 
       <View style={[styles.card, styles.cardSpacing]}>
         <Text style={styles.title}>Pending Events</Text>
@@ -201,6 +246,11 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, marginBottom: 10 },
   primaryButton: { backgroundColor: '#111827', borderRadius: 10, padding: 12, alignItems: 'center' },
   primaryButtonText: { color: '#fff', fontWeight: '700' },
+  toggleRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  toggleBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#d1d5db' },
+  toggleBtnActive: { backgroundColor: '#111827', borderColor: '#111827' },
+  toggleText: { color: '#111827', fontWeight: '600' },
+  toggleTextActive: { color: '#fff' },
 });
 
 

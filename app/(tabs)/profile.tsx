@@ -57,10 +57,10 @@ const Profile = () => {
             <View style={styles.roleContainer}>
               <View style={[
                 styles.roleBadge,
-                { backgroundColor: profile.role === 'member' ? '#10B981' : '#6B7280' }
+                { backgroundColor: profile.isAdmin ? '#2563EB' : (profile.role === 'member' ? '#10B981' : '#6B7280') }
               ]}>
                 <Text style={styles.roleText}>
-                  {profile.role === 'member' ? 'Club Member' : 'Student'}
+                  {profile.isAdmin ? 'Admin' : (profile.role === 'member' ? 'Club Member' : 'Student')}
                 </Text>
               </View>
             </View>
