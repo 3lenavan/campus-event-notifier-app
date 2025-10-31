@@ -17,11 +17,14 @@ export const seedClubsOnce = async (): Promise<void> => {
     }
 
     // Transform the JSON data to our Club interface
+    // Initialize both member and moderator hashes with legacy codeHash
     const clubs: Club[] = clubsData.map((club: any) => ({
       id: club.id,
       name: club.name,
       category: club.category,
       codeHash: club.codeHash,
+      codeHash_member: club.codeHash,
+      codeHash_moderator: club.codeHash,
     }));
 
     // Store in Local Storage

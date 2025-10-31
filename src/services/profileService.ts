@@ -1,4 +1,5 @@
 import { User } from 'firebase/auth';
+import { ADMIN_EMAILS } from '../lib/constants';
 import { sha256 } from '../lib/hash';
 import { getLS, LS_KEYS, setLS } from '../lib/localStorage';
 import { Club, UserProfile } from '../types';
@@ -33,11 +34,13 @@ export const upsertProfileFromAuth = async (user: User): Promise<UserProfile> =>
         email: user.email || '',
         role: 'student',
         memberships: [],
+        isAdmin: ADMIN_EMAILS.includes(user.email || ''),
       };
     } else {
       // Update existing profile with latest auth data
       profile.name = user.displayName || profile.name;
       profile.email = user.email || profile.email;
+      profile.isAdmin = ADMIN_EMAILS.includes(user.email || '');
     }
     
     // Save back to Local Storage
@@ -80,8 +83,9 @@ export const verifyClubMembership = async (
     // Hash the provided code
     const providedHash = await sha256(codePlaintext);
     
-    // Compare hashes
-    if (providedHash !== club.codeHash) {
+    // Compare hashes: support member/moderator specific hashes and legacy
+    const validHashes = [club.codeHash_member, club.codeHash_moderator, club.codeHash].filter(Boolean);
+    if (!validHashes.includes(providedHash)) {
       return { success: false, message: 'Invalid verification code.' };
     }
 

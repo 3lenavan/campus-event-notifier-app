@@ -5,6 +5,7 @@ export interface UserProfile {
   email: string;
   role: 'student' | 'member';
   memberships: string[]; // Array of club IDs
+  isAdmin?: boolean;
 }
 
 // Club Types
@@ -12,7 +13,10 @@ export interface Club {
   id: string;
   name: string;
   category: string;
-  codeHash: string;
+  // Backward compat: keep legacy codeHash, prefer member/moderator specific hashes
+  codeHash?: string;
+  codeHash_member?: string;
+  codeHash_moderator?: string;
 }
 
 // Event Types

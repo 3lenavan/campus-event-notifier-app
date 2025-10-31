@@ -1,17 +1,19 @@
-import React, { useState } from "react";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Switch,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useState } from "react";
+import {
+    SafeAreaView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { useAuthUser } from "../src/hooks/useAuthUser";
 
 export default function Settings() {
   const [darkMode, setDarkMode] = useState(false);
+  const { profile } = useAuthUser();
 
   const toggleDarkMode = () => setDarkMode(!darkMode);
 
@@ -55,6 +57,16 @@ export default function Settings() {
         <Text style={styles.title}>Update Password</Text>
         <Text style={styles.subtitle}>Change your account password</Text>
       </TouchableOpacity>
+
+      {profile?.isAdmin && (
+        <TouchableOpacity
+          style={[styles.card, styles.cardSpacing]}
+          onPress={() => router.push("/admin-settings")}
+        >
+          <Text style={styles.title}>Admin Settings</Text>
+          <Text style={styles.subtitle}>Approve/Reject events and rotate club codes</Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
