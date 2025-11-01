@@ -1,30 +1,24 @@
-import { useRouter } from "expo-router";
-import React, { useState, useEffect } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../FirebaseConfig";
-
-import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import EventCard from "../event-card"; // make sure this path is correct
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { useAuthUser } from "../../src/hooks/useAuthUser";
+import { getEventPolicy, isCreationEnabledForClub } from "../../src/lib/eventPolicy";
+import { getLS, LS_KEYS } from "../../src/lib/localStorage";
+import { listApprovedEvents } from "../../src/services/eventsService";
+import { Club } from "../../src/types";
+import { ClubModerationPanel } from "../../src/components";
+import EventCard from "../event-card";
 
-// Club data structure
-interface Club {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  imageUrl?: string;
-}
-
-// Event data structure
-interface Event {
+// Legacy event interface for compatibility with existing EventCard component
+interface LegacyEvent {
   id: string;
   title: string;
   description: string;
@@ -42,24 +36,46 @@ interface Event {
 
 export default function Discover() {
   const router = useRouter();
+  const { user, profile } = useAuthUser();
 
   // Search + expand state
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedClubs, setExpandedClubs] = useState<Set<string>>(new Set());
 
-  // Load events from Firestore
-  const [events, setEvents] = useState<Event[]>([]);
+  // Load events from Local Storage
+  const [events, setEvents] = useState<LegacyEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  
+  // Event policy state
+  const [eventPolicy, setEventPolicy] = useState<any>(null);
+  const [canCreateEvents, setCanCreateEvents] = useState<Record<string, boolean>>({});
+  
+  // Moderation panel state
+  const [showModerationPanel, setShowModerationPanel] = useState(false);
+  const [selectedClubForModeration, setSelectedClubForModeration] = useState<Club | null>(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "events"));
-        const eventData = querySnapshot.docs.map((doc) => ({
-          ...(doc.data() as Event),
-          id: doc.id, // attach Firestore document ID
+        const eventsData = await listApprovedEvents();
+        // Convert new Event format to legacy format for EventCard compatibility
+        const legacyEvents: LegacyEvent[] = eventsData.map(event => ({
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          date: new Date(event.dateISO).toISOString().split('T')[0],
+          time: new Date(event.dateISO).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+          }),
+          location: event.location,
+          category: 'Club Event', // Default category
+          attendees: 0, // Default attendees
+          clubId: event.clubId,
+          clubName: 'Unknown Club', // Will be resolved below
         }));
-        setEvents(eventData);
+        setEvents(legacyEvents);
       } catch (error) {
         console.error("Error fetching events:", error);
       } finally {
@@ -70,19 +86,15 @@ export default function Discover() {
     fetchEvents();
   }, []);
 
-  // Load clubs from Firestore
+  // Load clubs from Local Storage
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchClubs = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "clubs"));
-        const clubData = querySnapshot.docs.map((doc) => ({
-          ...(doc.data() as Club),
-          id: doc.id,
-        })) as Club[];
-        setClubs(clubData);
+        const clubsData = await getLS<Club[]>(LS_KEYS.CLUBS, []);
+        setClubs(clubsData);
       } catch (error) {
         console.error("Error fetching clubs:", error);
       } finally {
@@ -93,11 +105,48 @@ export default function Discover() {
     fetchClubs();
   }, []);
 
+  // Load event policy
+  useEffect(() => {
+    const loadEventPolicy = async () => {
+      try {
+        const policy = await getEventPolicy();
+        setEventPolicy(policy);
+      } catch (error) {
+        console.error("Error loading event policy:", error);
+      }
+    };
+
+    loadEventPolicy();
+  }, []);
+
+  // Check creation permissions for all clubs when profile or policy changes
+  useEffect(() => {
+    const checkCreationPermissions = async () => {
+      if (!profile || !clubs.length) return;
+      
+      const permissions: Record<string, boolean> = {};
+      
+      for (const club of clubs) {
+        try {
+          const canCreate = await canCreateEvent(club.id);
+          permissions[club.id] = canCreate;
+        } catch (error) {
+          console.error(`Error checking permissions for club ${club.id}:`, error);
+          permissions[club.id] = false;
+        }
+      }
+      
+      setCanCreateEvents(permissions);
+    };
+
+    checkCreationPermissions();
+  }, [profile, clubs, eventPolicy]);
+
   // Filters club list by search input
   const filteredClubs = clubs.filter(
     (club) =>
       club.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      club.description.toLowerCase().includes(searchQuery.toLowerCase())
+      club.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Groups and sorts events by club
@@ -109,6 +158,23 @@ export default function Discover() {
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
       );
 
+  // Check if user can create events for a club
+  const canCreateEvent = async (clubId: string) => {
+    // Basic membership check
+    if (!profile || profile.role !== 'member' || !profile.memberships.includes(clubId)) {
+      return false;
+    }
+    
+    // Check if event creation is enabled for this club
+    try {
+      const isEnabled = await isCreationEnabledForClub(clubId);
+      return isEnabled;
+    } catch (error) {
+      console.error('Error checking event creation policy:', error);
+      return false;
+    }
+  };
+
   // Toggles club expand/collapse
   const toggleClubExpansion = (clubId: string) => {
     const newExpanded = new Set(expandedClubs);
@@ -119,6 +185,17 @@ export default function Discover() {
   };
 
   const isClubExpanded = (clubId: string) => expandedClubs.has(clubId);
+
+  // Handle moderation panel
+  const openModerationPanel = (club: Club) => {
+    setSelectedClubForModeration(club);
+    setShowModerationPanel(true);
+  };
+
+  const closeModerationPanel = () => {
+    setShowModerationPanel(false);
+    setSelectedClubForModeration(null);
+  };
 
   // Assigns colors to category tags
   const getCategoryColor = (category: string) => {
@@ -153,6 +230,28 @@ export default function Discover() {
   // Main content
   return (
     <View style={styles.container}>
+      {/* Moderation Panel */}
+      {showModerationPanel && selectedClubForModeration && (
+        <View style={styles.moderationPanelOverlay}>
+          <View style={styles.moderationPanel}>
+            <View style={styles.moderationPanelHeader}>
+              <Text style={styles.moderationPanelTitle}>
+                Moderate {selectedClubForModeration.name}
+              </Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={closeModerationPanel}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ClubModerationPanel
+              clubId={selectedClubForModeration.id}
+              clubName={selectedClubForModeration.name}
+            />
+          </View>
+        </View>
+      )}
       {/* Header section */}
       <View style={styles.header}>
         <View>
@@ -206,7 +305,7 @@ export default function Discover() {
                   <View style={styles.clubInfo}>
                     <Text style={styles.clubName}>{club.name}</Text>
                     <Text style={styles.clubDescription}>
-                      {club.description}
+                      {club.category}
                     </Text>
 
                     <View style={styles.badgeRow}>
@@ -218,10 +317,53 @@ export default function Discover() {
                       >
                         <Text style={styles.categoryText}>{club.category}</Text>
                       </View>
+                      
+                      {/* Membership indicator */}
+                      {profile?.memberships.includes(club.id) && (
+                        <View style={styles.membershipBadge}>
+                          <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                          <Text style={styles.membershipText}>Member</Text>
+                        </View>
+                      )}
+                      
                       <Text style={styles.eventCount}>
                         {clubEvents.length} upcoming event
                         {clubEvents.length !== 1 ? "s" : ""}
                       </Text>
+                    </View>
+
+                    {/* Action Buttons */}
+                    <View style={styles.actionButtonsContainer}>
+                      {/* Create Event Button - only show if user can create events */}
+                      {canCreateEvents[club.id] && (
+                        <TouchableOpacity
+                          style={styles.createEventButton}
+                          onPress={() => router.push({
+                            pathname: '/create-event',
+                            params: { clubId: club.id }
+                          })}
+                        >
+                          <Ionicons name="add-circle" size={16} color="#3B82F6" />
+                          <Text style={styles.createEventButtonText}>
+                            {eventPolicy?.moderationMode !== "off" 
+                              ? "Submit Event (goes to review)" 
+                              : "Create Event"}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      
+                      {/* Moderation Button - only show if user is a member and moderation is enabled */}
+                      {profile?.role === 'member' && 
+                       profile?.memberships.includes(club.id) && 
+                       eventPolicy?.moderationMode !== "off" && (
+                        <TouchableOpacity
+                          style={styles.moderationButton}
+                          onPress={() => openModerationPanel(club)}
+                        >
+                          <Ionicons name="shield-checkmark" size={16} color="#8B5CF6" />
+                          <Text style={styles.moderationButtonText}>Moderate</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 </View>
@@ -350,5 +492,95 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     marginTop: 8,
     fontSize: 13,
+  },
+  actionButtonsContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+    flexWrap: "wrap",
+  },
+  createEventButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EBF4FF",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: "flex-start",
+  },
+  createEventButtonText: {
+    color: "#3B82F6",
+    fontSize: 12,
+    fontWeight: "500",
+    marginLeft: 4,
+  },
+  moderationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3E8FF",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: "flex-start",
+  },
+  moderationButtonText: {
+    color: "#8B5CF6",
+    fontSize: 12,
+    fontWeight: "500",
+    marginLeft: 4,
+  },
+  membershipBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F0FDF4",
+    borderWidth: 1,
+    borderColor: "#10B981",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  membershipText: {
+    color: "#065F46",
+    fontSize: 10,
+    fontWeight: "500",
+    marginLeft: 2,
+  },
+  moderationPanelOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    zIndex: 1000,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  moderationPanel: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    width: "90%",
+    height: "80%",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  moderationPanelHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  moderationPanelTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#111827",
+  },
+  closeButton: {
+    padding: 4,
   },
 });

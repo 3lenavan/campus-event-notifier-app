@@ -1,7 +1,11 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 import { useColorScheme } from "react-native";
+import { seedClubsOnce } from "../src/bootstrap/seedClubs";
+import { initializeNotifications } from "../src/lib/notifications";
+import { useAuthUser } from "../src/hooks/useAuthUser";
 
 const LightTheme = {
   ...DefaultTheme,
@@ -31,6 +35,29 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? DarkThemeCustom : LightTheme;
+  const { user } = useAuthUser();
+
+  // Initialize app data on startup
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        // Seed clubs data from JSON file
+        await seedClubsOnce();
+        console.log('App initialization complete');
+      } catch (error) {
+        console.error('Error initializing app:', error);
+      }
+    };
+
+    initializeApp();
+  }, []);
+
+  // Initialize notifications when user is available
+  useEffect(() => {
+    if (user?.uid) {
+      initializeNotifications(user.uid);
+    }
+  }, [user?.uid]);
 
   return (
     <ThemeProvider value={theme}>
@@ -48,6 +75,46 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="verify-club" 
+          options={{ 
+            title: "Verify Club Membership",
+            headerShown: true,
+            presentation: "modal"
+          }} 
+        />
+        <Stack.Screen 
+          name="settings" 
+          options={{ 
+            title: "Settings",
+            headerShown: true,
+            presentation: "modal"
+          }} 
+        />
+        <Stack.Screen 
+          name="signup" 
+          options={{ 
+            title: "Sign Up",
+            headerShown: true,
+            presentation: "modal"
+          }} 
+        />
+        <Stack.Screen 
+          name="update-email" 
+          options={{ 
+            title: "Update Email",
+            headerShown: true,
+            presentation: "modal"
+          }} 
+        />
+        <Stack.Screen 
+          name="update-password" 
+          options={{ 
+            title: "Update Password",
+            headerShown: true,
+            presentation: "modal"
+          }} 
+        />
       </Stack>
     </ThemeProvider>
   );
