@@ -1,9 +1,10 @@
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { getAuth } from "firebase/auth";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
-import snhuClubs from "../../data/snhu_clubs_with_hashes.json";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
+import { getLS, LS_KEYS } from "../../src/lib/localStorage";
+import { listApprovedEvents } from "../../src/services/eventsService";
 import EventCard, { Event as BaseEvent } from "../event-card";
 
 type FeedEvent = BaseEvent & {
@@ -29,71 +30,41 @@ export default function HomeScreen() {
     return () => unsub();
   }, []);
 
-  // Function to generate realistic events from club data
-  const generateEventsFromClubs = useCallback((): FeedEvent[] => {
-    const eventTemplates = [
-      { type: "Weekly Meeting", time: "6:00 PM", duration: "1 hour", attendees: [15, 50] },
-      { type: "Workshop", time: "7:00 PM", duration: "2 hours", attendees: [20, 60] },
-      { type: "Social Event", time: "8:00 PM", duration: "3 hours", attendees: [30, 100] },
-      { type: "Study Session", time: "5:00 PM", duration: "2 hours", attendees: [10, 30] },
-      { type: "Guest Speaker", time: "6:30 PM", duration: "1.5 hours", attendees: [25, 80] },
-      { type: "Community Service", time: "10:00 AM", duration: "4 hours", attendees: [15, 40] },
-    ];
+  const [events, setEvents] = useState<FeedEvent[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-    const locations = [
-      "Student Union Room 201", "Library Conference Room", "Engineering Hall 301", 
-      "Business School Auditorium", "Campus Center", "Academic Building 205",
-      "Student Lounge", "Multipurpose Room", "Lecture Hall A", "Study Commons"
-    ];
-
-    const categories = [
-      "Academic", "Arts", "Sports", "Community Service", "Social", "Career", "Cultural"
-    ];
-
-    const imageUrls = [
-      "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&q=80&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&q=80&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&q=80&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&q=80&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=1200&q=80&auto=format&fit=crop",
-    ];
-
-    return snhuClubs.slice(0, 20).map((club, index) => {
-      const template = eventTemplates[index % eventTemplates.length];
-      const daysFromNow = Math.floor(Math.random() * 14); // Events within next 2 weeks
-      const eventDate = new Date(Date.now() + daysFromNow * 86400000);
-      const [minAttendees, maxAttendees] = template.attendees;
-      const currentAttendees = Math.floor(Math.random() * (maxAttendees - minAttendees)) + minAttendees;
-      
-      return {
-        id: club.id,
-        title: `${club.name} - ${template.type}`,
-        description: `Join ${club.name} for our ${template.type.toLowerCase()}. ${template.duration} of engaging activities and networking opportunities.`,
-        date: eventDate.toISOString(),
-        time: template.time,
-        location: locations[index % locations.length],
-        category: categories[index % categories.length],
-        attendees: currentAttendees,
-        maxAttendees: maxAttendees,
-        imageUrl: imageUrls[index % imageUrls.length],
-        isUserAttending: Math.random() > 0.7, // 30% chance user is attending
-        likes: Math.floor(Math.random() * 50) + 5,
-        liked: Math.random() > 0.8, // 20% chance user liked
-        favorited: Math.random() > 0.9, // 10% chance user favorited
-        club: { 
-          id: club.id, 
-          name: club.name,
-          avatarUrl: undefined 
-        },
-      };
-    });
+  const loadApproved = useCallback(async () => {
+    try {
+      const approved = await listApprovedEvents();
+      const clubs = (await getLS<any[]>(LS_KEYS.CLUBS, [])) || [];
+      const eventsMapped: FeedEvent[] = approved.map((event) => {
+        const date = new Date(event.dateISO);
+        return {
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          date: date.toISOString(),
+          time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+          location: event.location,
+          category: "Club Event",
+          attendees: 0,
+          maxAttendees: undefined,
+          imageUrl: undefined,
+          isUserAttending: false,
+          likes: 0,
+          liked: false,
+          favorited: false,
+          club: { id: event.clubId, name: clubs.find((c:any)=>c.id===event.clubId)?.name || "Unknown Club" },
+        };
+      }).sort((a,b)=> new Date(a.date).getTime() - new Date(b.date).getTime());
+      setEvents(eventsMapped);
+    } catch (e) {
+      console.error("Error loading approved events:", e);
+    }
   }, []);
 
-  const initialData = useMemo<FeedEvent[]>(() => generateEventsFromClubs(), [generateEventsFromClubs]);
-
-  const [events, setEvents] = useState<FeedEvent[]>(initialData);
-  const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => { loadApproved(); }, [loadApproved]);
+  useFocusEffect(useCallback(() => { loadApproved(); }, [loadApproved]));
 
   const onPressEvent = useCallback((event: BaseEvent) => {
     router.push({ pathname: "/event-details-screen", params: { id: event.id } });
@@ -129,13 +100,8 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => {
-      // Generate new events from clubs data
-      const newEvents = generateEventsFromClubs();
-      setEvents(newEvents);
-      setRefreshing(false);
-    }, 900);
-  }, [generateEventsFromClubs]);
+    loadApproved().finally(() => setRefreshing(false));
+  }, [loadApproved]);
 
   return (
     <View style={styles.container}>
@@ -189,7 +155,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: "#FACC15",
   },
   clubName: { fontSize: 14, fontWeight: "600", color: "#111827" },
   postSubtle: { fontSize: 12, color: "#6B7280" },

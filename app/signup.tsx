@@ -79,10 +79,12 @@ export default function Signup() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: '#F0F7FF' }]}> 
       <View style={styles.container}>
-        <View style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>Create Account</Text>
+        <View style={styles.heroBubble} />
+        <View style={styles.heroBubbleSmall} />
+        <View style={[styles.card, styles.glassCard]}> 
+          <Text style={[styles.title, { color: theme.colors.primary }]}>Create Account</Text>
 
           {/* First Name Input */}
           <TextInput
@@ -131,8 +133,8 @@ export default function Signup() {
           </TouchableOpacity>
 
           {/* Back to login */}
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.replace("/")}>
-            <Text style={[styles.secondaryBtnText, { color: theme.colors.text }]}>Back to Login</Text>
+          <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: '#FACC15', borderColor: 'transparent' }]} onPress={() => router.replace("/")}>
+            <Text style={[styles.secondaryBtnText, { color: '#111827' }]}>Back to Login</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -148,17 +150,45 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 24,
   },
+  heroBubble: {
+    position: "absolute",
+    top: 40,
+    right: -30,
+    width: 180,
+    height: 180,
+    backgroundColor: "#DBEAFE",
+    borderRadius: 120,
+  },
+  heroBubbleSmall: {
+    position: "absolute",
+    bottom: 60,
+    left: -20,
+    width: 120,
+    height: 120,
+    backgroundColor: "#FEF9C3",
+    borderRadius: 100,
+  },
   card: {
     width: "100%",
     maxWidth: 420,
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 20,
     borderWidth: 1,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
     elevation: 4,
+  },
+  glassCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+    borderWidth: 1.5,
+    shadowColor: '#1D4ED8',
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
   title: {
     fontSize: 28,
@@ -168,7 +198,7 @@ const styles = StyleSheet.create({
   input: {
     width: "100%",
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginTop: 12,
@@ -176,11 +206,15 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     width: "100%",
-    borderRadius: 12,
+    borderRadius: 999,
     paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 16,
+    shadowColor: "#1D4ED8",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
   },
   primaryBtnText: {
     color: "#fff",
@@ -189,13 +223,13 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     width: "100%",
-    borderRadius: 12,
+    borderRadius: 999,
     paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#D6E4FF",
   },
   secondaryBtnText: {
     fontWeight: "600",

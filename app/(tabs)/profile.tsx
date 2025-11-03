@@ -138,10 +138,16 @@ const styles = StyleSheet.create({
   profileBox: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: "#f9fafb",
+    padding: 18,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#D6E4FF",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
   },
   avatar: {
     width: 60,
@@ -184,9 +190,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   roleBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
     alignSelf: "flex-start",
   },
   roleText: {

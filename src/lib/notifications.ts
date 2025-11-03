@@ -1,6 +1,6 @@
-import { getLS, LS_KEYS, setLS } from './localStorage';
 import { listApprovedEvents } from '../services/eventsService';
 import { Event } from '../types';
+import { getLS, LS_KEYS, setLS } from './localStorage';
 
 // Notification tracking keys
 const NOTIFIED_KEYS = (uid: string) => `notifiedKeys:${uid}`;
@@ -57,6 +57,7 @@ const formatTimeForNotification = (dateISO: string): string => {
 const getClubName = async (clubId: string): Promise<string> => {
   try {
     const clubs = await getLS<any[]>(LS_KEYS.CLUBS, []);
+    if (!clubs) return 'Unknown Club';
     const club = clubs.find(c => c.id === clubId);
     return club?.name || 'Unknown Club';
   } catch (error) {
@@ -75,6 +76,7 @@ const shouldNotifyForEvent = async (
 ): Promise<boolean> => {
   try {
     const notifiedKeys = await getLS<string[]>(NOTIFIED_KEYS(uid), []);
+    if (!notifiedKeys) return true;
     const key = `${event.id}:${timeWindow}`;
     return !notifiedKeys.includes(key);
   } catch (error) {
@@ -94,10 +96,11 @@ const markEventAsNotified = async (
   try {
     const notifiedKeys = await getLS<string[]>(NOTIFIED_KEYS(uid), []);
     const key = `${event.id}:${timeWindow}`;
+    const keys = notifiedKeys || [];
     
-    if (!notifiedKeys.includes(key)) {
-      notifiedKeys.push(key);
-      await setLS(NOTIFIED_KEYS(uid), notifiedKeys);
+    if (!keys.includes(key)) {
+      keys.push(key);
+      await setLS(NOTIFIED_KEYS(uid), keys);
     }
   } catch (error) {
     console.error('Error marking event as notified:', error);
@@ -130,6 +133,7 @@ const showEventNotification = async (event: Event, timeWindow: '24h' | '1h'): Pr
  */
 const checkAndNotifyEvents = async (uid: string): Promise<void> => {
   try {
+    // Notify all users about all approved events (not just from their clubs)
     const events = await listApprovedEvents();
     const now = new Date();
     
@@ -196,6 +200,34 @@ export const initializeNotifications = async (uid: string): Promise<void> => {
   } catch (error) {
     console.error('Error initializing notifications:', error);
   }
+};
+
+/**
+ * Fire-and-forget immediate notification
+ */
+export const notifyNow = async (title: string, body: string): Promise<void> => {
+  try {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    new Notification(title, { body, icon: '/favicon.png' });
+  } catch (error) {
+    console.error('Error showing immediate notification:', error);
+  }
+};
+
+/**
+ * RSVP confirmation helper
+ */
+export const notifyRSVPConfirmation = async (eventTitle: string): Promise<void> => {
+  await notifyNow('RSVP Confirmed', `You RSVP'd for ${eventTitle}`);
+};
+
+/**
+ * Admin approval update helper
+ */
+export const notifyApprovalUpdate = async (eventTitle: string, approved: boolean): Promise<void> => {
+  const status = approved ? 'approved' : 'rejected';
+  await notifyNow('Event Update', `${eventTitle} was ${status}`);
 };
 
 /**

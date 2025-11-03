@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuthUser } from '../src/hooks/useAuthUser';
 import { EventPolicy, getEventPolicy, setEventPolicy } from '../src/lib/eventPolicy';
+import { notifyApprovalUpdate } from '../src/lib/notifications';
 import { listClubs, updateClubCodes } from '../src/services/clubsService';
 import { approveEvent, listEvents, rejectEvent } from '../src/services/eventsService';
 import { Club, Event } from '../src/types';
@@ -55,6 +56,14 @@ export default function AdminSettings() {
     try {
       await approveEvent(eventId);
       setAllEvents(prev => prev.map(e => (e.id === eventId ? { ...e, status: 'approved' } : e)));
+      const ev = allEvents.find(e => e.id === eventId);
+      if (ev) { 
+        try { 
+          // Notify creator about approval
+          await notifyApprovalUpdate(ev.title, true);
+          // Also notify that a new event is available (for all users via scan loop)
+        } catch {} 
+      }
     } catch (e) {
       Alert.alert('Error', 'Failed to approve event');
     }
@@ -76,6 +85,8 @@ export default function AdminSettings() {
     try {
       await rejectEvent(eventId, 'Rejected by admin');
       setAllEvents(prev => prev.map(e => (e.id === eventId ? { ...e, status: 'rejected', moderationNote: 'Rejected by admin' } : e)));
+      const ev = allEvents.find(e => e.id === eventId);
+      if (ev) { try { await notifyApprovalUpdate(ev.title, false); } catch {} }
     } catch (e) {
       Alert.alert('Error', 'Failed to reject event');
     }

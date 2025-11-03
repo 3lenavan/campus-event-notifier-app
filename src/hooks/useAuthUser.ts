@@ -1,13 +1,15 @@
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { auth } from '../lib/firebase';
-import { upsertProfileFromAuth } from '../services/profileService';
+import { initializeNotifications } from '../lib/notifications';
+import { getProfile, upsertProfileFromAuth } from '../services/profileService';
 import { UserProfile } from '../types';
 
 interface AuthState {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 /**
@@ -19,14 +21,44 @@ export const useAuthUser = (): AuthState => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const loadProfile = useCallback(async (firebaseUser: User) => {
+    try {
+      const userProfile = await upsertProfileFromAuth(firebaseUser);
+      setProfile(userProfile);
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    try {
+      // Reload profile from storage (which may have been updated by verification)
+      const updatedProfile = await getProfile(user.uid);
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+      } else {
+        // If profile doesn't exist, recreate it from auth
+        await loadProfile(user);
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+    }
+  }, [user, loadProfile]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
           // User is signed in - create or update local profile
-          const userProfile = await upsertProfileFromAuth(firebaseUser);
+          await loadProfile(firebaseUser);
           setUser(firebaseUser);
-          setProfile(userProfile);
+          // Initialize notifications after login
+          try {
+            await initializeNotifications(firebaseUser.uid);
+          } catch (e) {
+            console.error('Failed to initialize notifications', e);
+          }
         } else {
           // User is signed out
           setUser(null);
@@ -43,7 +75,7 @@ export const useAuthUser = (): AuthState => {
     });
 
     return unsubscribe;
-  }, []);
+  }, [loadProfile]);
 
-  return { user, profile, loading };
+  return { user, profile, loading, refreshProfile };
 };

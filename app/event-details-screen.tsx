@@ -1,25 +1,26 @@
 // Imports
-import { db, auth } from "../FirebaseConfig";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-  collection,
-  addDoc,
-} from "firebase/firestore";
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
+import {
+    addDoc,
+    collection,
+    doc,
+    getDoc,
+    serverTimestamp,
+    setDoc,
+} from "firebase/firestore";
+import { useEffect, useState } from "react";
+import {
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { auth, db } from "../FirebaseConfig";
+import { notifyRSVPConfirmation } from "../src/lib/notifications";
 
 // Event interface
 interface Event {
@@ -97,6 +98,7 @@ export default function EventDetails() {
       });
 
       alert(`You have RSVP'd for "${eventTitle}" successfully!`);
+      try { await notifyRSVPConfirmation(eventTitle); } catch {}
     } catch (error) {
       console.error("Error RSVPing:", error);
       alert("Something went wrong. Please try again.");

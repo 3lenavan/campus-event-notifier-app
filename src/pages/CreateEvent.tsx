@@ -3,20 +3,21 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuthUser } from '../hooks/useAuthUser';
 import { getDefaultDenylist, validateEventInput } from '../lib/eventValidators';
 import { getLS, LS_KEYS } from '../lib/localStorage';
+import { notifyNow } from '../lib/notifications';
 import { createEvent } from '../services/eventsService';
 import { Club } from '../types';
 
@@ -26,7 +27,7 @@ interface CreateEventProps {
 
 export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   const router = useRouter();
-  const { user, profile } = useAuthUser();
+  const { user, profile, refreshProfile } = useAuthUser();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClubId, setSelectedClubId] = useState(clubId || '');
   const [title, setTitle] = useState('');
@@ -41,7 +42,11 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
   useEffect(() => {
     loadClubs();
-  }, []);
+    // Refresh profile on mount to ensure we have latest memberships
+    if (user) {
+      refreshProfile();
+    }
+  }, [user, refreshProfile]);
 
   // If clubs load and user has memberships, preselect first club
   useEffect(() => {
@@ -55,7 +60,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   const loadClubs = async () => {
     try {
       const clubsData = await getLS<Club[]>(LS_KEYS.CLUBS, []);
-      setClubs(clubsData);
+      setClubs(clubsData || []);
     } catch (error) {
       console.error('Error loading clubs:', error);
       Alert.alert('Error', 'Failed to load clubs');
@@ -151,7 +156,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
       }
 
       // If validation passes, create the event
-      await createEvent(
+      const newEvent = await createEvent(
         {
           title: title.trim(),
           description: description.trim(),
@@ -161,6 +166,13 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
         },
         user.uid
       );
+
+      // If auto-approved, notify that a new event is available
+      if (newEvent.status === 'approved') {
+        try { 
+          await notifyNow('New Event Available', `${newEvent.title} is now available to RSVP`);
+        } catch {}
+      }
 
       Alert.alert('Success', 'Event created successfully!', [
         {
@@ -424,8 +436,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   backButton: {
     padding: 8,
@@ -451,12 +461,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#D6E4FF',
     fontSize: 16,
     color: '#111827',
   },
@@ -475,16 +485,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   clubOption: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#D6E4FF',
   },
   clubOptionSelected: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
+    backgroundColor: '#1D4ED8',
+    borderColor: '#1D4ED8',
   },
   clubOptionText: {
     fontSize: 14,
@@ -498,8 +508,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3B82F6',
-    borderRadius: 12,
+    backgroundColor: '#1D4ED8',
+    borderRadius: 999,
     paddingVertical: 16,
     marginTop: 16,
     marginBottom: 32,

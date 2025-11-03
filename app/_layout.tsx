@@ -4,18 +4,19 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { useColorScheme } from "react-native";
 import { seedClubsOnce } from "../src/bootstrap/seedClubs";
-import { initializeNotifications } from "../src/lib/notifications";
 import { useAuthUser } from "../src/hooks/useAuthUser";
+import { initializeNotifications } from "../src/lib/notifications";
 
 const LightTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    primary: "#2563eb",
-    background: "#f7f8fa",
-    card: "#ffffff",
-    text: "#0b0c0e",
-    border: "#e6e8eb",
+    // BuzzUp (SNHU) kawaii palette: blue + yellow accents
+    primary: "#1D4ED8", // SNHU blue
+    background: "#F0F7FF", // soft sky blue
+    card: "#FFFFFF",
+    text: "#0B0C0E",
+    border: "#D6E4FF", // light blue border
   },
 };
 
@@ -94,8 +95,7 @@ export default function RootLayout() {
         <Stack.Screen 
           name="signup" 
           options={{ 
-            title: "Sign Up",
-            headerShown: true,
+            headerShown: false,
             presentation: "modal"
           }} 
         />

@@ -1,16 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAuthUser } from '../hooks/useAuthUser';
 import { getLS, LS_KEYS } from '../lib/localStorage';
@@ -22,7 +22,7 @@ interface VerifyClubProps {
 }
 
 export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
-  const { user, profile } = useAuthUser();
+  const { user, profile, refreshProfile } = useAuthUser();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [clubInput, setClubInput] = useState('');
   const [codeInput, setCodeInput] = useState('');
@@ -60,6 +60,9 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
       const result = await verifyClubMembership(user.uid, clubInput.trim(), codeInput.trim());
       
       if (result.success) {
+        // Refresh profile to get updated memberships immediately
+        await refreshProfile();
+        
         Alert.alert(
           '✅ Membership Confirmed!', 
           `You have been successfully added to ${result.club?.name}. You can now create events for this club!`, 
@@ -131,7 +134,7 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
     >
       <View style={styles.content}>
         <View style={styles.header}>
-          <Ionicons name="shield-checkmark" size={48} color="#10B981" />
+          <Ionicons name="shield-checkmark" size={48} color="#1D4ED8" />
           <Text style={styles.title}>Verify Club Membership</Text>
           <Text style={styles.subtitle}>
             Join clubs by entering the club name and verification code. You can verify multiple club memberships.
@@ -142,7 +145,7 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="school-outline" size={20} color="#6B7280" style={styles.inputIcon} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderRadius: 999, borderColor: '#D6E4FF' }]}
               placeholder="Club name or ID"
               value={clubInput}
               onChangeText={(text) => {
@@ -177,7 +180,7 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
           <View style={styles.inputContainer}>
             <Ionicons name="key-outline" size={20} color="#6B7280" style={styles.inputIcon} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderRadius: 999, borderColor: '#D6E4FF' }]}
               placeholder="Verification code"
               value={codeInput}
               onChangeText={setCodeInput}
@@ -197,7 +200,7 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
           </View>
 
           <TouchableOpacity
-            style={[styles.verifyButton, loading && styles.buttonDisabled]}
+            style={[styles.verifyButton, { backgroundColor: '#1D4ED8', borderRadius: 999 }, loading && styles.buttonDisabled]}
             onPress={handleVerify}
             disabled={loading}
           >
