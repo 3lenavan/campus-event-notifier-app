@@ -1,25 +1,26 @@
 // Imports
-import { db, auth } from "../FirebaseConfig";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-  collection,
-  addDoc,
-} from "firebase/firestore";
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
+import {
+    addDoc,
+    collection,
+    doc,
+    getDoc,
+    serverTimestamp,
+    setDoc,
+} from "firebase/firestore";
+import { useEffect, useState } from "react";
+import {
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { auth, db } from "../FirebaseConfig";
+import { notifyRSVPConfirmation } from "../src/lib/notifications";
 
 // Event interface
 interface Event {
@@ -91,15 +92,65 @@ export default function EventDetails() {
 
       await addDoc(collection(db, "notifications"), {
         userId: currentUser.uid,
-        message: `You RSVP’d for ${eventTitle}!`,
+        message: `You RSVP'd for ${eventTitle}!`,
         timestamp: serverTimestamp(),
         read: false,
       });
 
-      alert(`You have RSVP’d for “${eventTitle}” successfully!`);
+      alert(`You have RSVP'd for "${eventTitle}" successfully!`);
+      try { await notifyRSVPConfirmation(eventTitle); } catch {}
     } catch (error) {
       console.error("Error RSVPing:", error);
       alert("Something went wrong. Please try again.");
+    }
+  };
+
+  // Handle Add to Calendar
+  const handleAddToCalendar = (event: Event) => {
+    try {
+      // Create event date/time
+      const eventDateTime = new Date(`${event.date}T${event.time}`);
+      const startTime = eventDateTime.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      const endTime = new Date(eventDateTime.getTime() + 2 * 60 * 60 * 1000) // Add 2 hours
+        .toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      
+      // Generate unique ID
+      const uid = `event-${event.id}-${Date.now()}`;
+      
+      // Create ICS content
+      const icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Campus Event Notifier//EN',
+        'BEGIN:VEVENT',
+        `UID:${uid}`,
+        `DTSTART:${startTime}`,
+        `DTEND:${endTime}`,
+        `SUMMARY:${event.title}`,
+        `DESCRIPTION:${event.description}\\n\\nLocation: ${event.location}`,
+        `LOCATION:${event.location}`,
+        `STATUS:CONFIRMED`,
+        `TRANSP:OPAQUE`,
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
+
+      // Create and download the file
+      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      alert('Calendar file downloaded successfully!');
+    } catch (error) {
+      console.error('Error creating calendar file:', error);
+      alert('Failed to create calendar file. Please try again.');
     }
   };
 
@@ -286,6 +337,20 @@ export default function EventDetails() {
             </>
           )}
         </View>
+
+        {/* Add to Calendar */}
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={[styles.button, styles.calendarButton]}
+            onPress={() => handleAddToCalendar(event)}
+          >
+            <Ionicons name="calendar-outline" size={20} color="white" style={styles.buttonIcon} />
+            <Text style={styles.buttonText}>Add to Calendar</Text>
+          </TouchableOpacity>
+          <Text style={styles.calendarNote}>
+            Download an .ics file to add this event to your calendar
+          </Text>
+        </View>
       </ScrollView>
     </View>
   );
@@ -348,6 +413,21 @@ const styles = StyleSheet.create({
   cancelText: { color: "#111827" },
   disabled: { backgroundColor: "#9CA3AF" },
   rsvpNote: {
+    textAlign: "center",
+    fontSize: 13,
+    color: "#6B7280",
+    marginTop: 6,
+  },
+  calendarButton: { 
+    backgroundColor: "#10B981",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  calendarNote: {
     textAlign: "center",
     fontSize: 13,
     color: "#6B7280",

@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 export interface Event {
@@ -285,9 +285,9 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, color: "#1F2937", fontWeight: "500" },
   details: { marginTop: 8 },
   iconItem: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
-  detailText: { fontSize: 13, color: "#4B5563" },
+  detailText: { fontSize: 13, color: "#334155" },
   rsvpButton: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#1D4ED8",
     paddingVertical: 8,
     borderRadius: 8,
     marginTop: 10,

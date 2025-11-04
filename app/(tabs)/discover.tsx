@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+// Firestore Interfaces
 interface Club {
   id: string;
   name: string;
@@ -35,14 +36,14 @@ export default function Discover() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Fetch clubs + events
+  // ✅ Fetch clubs + events from Firestore
   useEffect(() => {
     const fetchData = async () => {
       try {
         const clubSnap = await getDocs(collection(db, "clubs"));
         const clubData = clubSnap.docs.map((doc) => {
           const data = doc.data() as Club;
-          const { id: _, ...rest } = data; // remove any Firestore id field if exists
+          const { id: _, ...rest } = data; // remove Firestore field id if exists
           return { id: doc.id, ...rest };
         });
 
@@ -65,15 +66,18 @@ export default function Discover() {
     fetchData();
   }, []);
 
+  // ✅ Filter by search input
   const filteredClubs = clubs.filter(
     (club) =>
       club.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      club.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
       club.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getEventCount = (clubId: string) =>
     events.filter((event) => event.clubId === clubId).length;
 
+  // ✅ Category color mapping
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
       Academic: "#3B82F6",
@@ -104,7 +108,7 @@ export default function Discover() {
         </View>
       </View>
 
-      {/* ✅ Search Bar with outlined border */}
+      {/* ✅ Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons
           name="search-outline"
@@ -121,7 +125,7 @@ export default function Discover() {
         />
       </View>
 
-      {/* Club List */}
+      {/* ✅ Club List */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {filteredClubs.length === 0 ? (
           <View style={styles.emptyState}>
@@ -209,7 +213,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: "bold", color: "#111827" },
   headerSubtitle: { fontSize: 13, color: "#6B7280" },
 
-  // ✅ Better Search Bar with even border
+  // ✅ Better Search Bar
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -240,7 +244,7 @@ const styles = StyleSheet.create({
   emptyText: { color: "#6B7280", fontSize: 15 },
   emptySubText: { fontSize: 12, color: "#9CA3AF", marginTop: 4 },
 
-  // ✅ Clean Card Styling
+  // ✅ Card Styling
   clubCard: {
     backgroundColor: "white",
     borderRadius: 16,
