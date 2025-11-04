@@ -58,7 +58,7 @@ export default function ClubDetailsScreen() {
   useEffect(() => {
     const fetchClubAndEvents = async () => {
       try {
-        // Fetch club info
+        // Fetch club head
         const clubDoc = await getDoc(doc(db, "clubs", id as string));
         if (clubDoc.exists()) {
           const data = clubDoc.data() as Club;
@@ -244,7 +244,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    paddingTop: 50, // push down from the top of the screen (adjustable)
     backgroundColor: "white",
     borderBottomWidth: 1,
     borderColor: "#E5E7EB",
