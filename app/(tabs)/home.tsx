@@ -6,6 +6,7 @@ import { useAuthUser } from "../../src/hooks/useAuthUser";
 import { getLS, LS_KEYS } from "../../src/lib/localStorage";
 import { listApprovedEvents } from "../../src/services/eventsService";
 import EventCard, { Event as BaseEvent } from "../event-card";
+import supabase from "../config/superbaseClient"
 
 type FeedEvent = BaseEvent & {
   likes: number;

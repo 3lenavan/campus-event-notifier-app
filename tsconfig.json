@@ -15,5 +15,6 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-  ]
+, "node_modules/superbaseClient.tsx"  ]
 }
+

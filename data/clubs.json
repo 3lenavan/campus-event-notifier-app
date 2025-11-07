@@ -1,0 +1,39 @@
+[
+  {
+    "id": "bio-club",
+    "name": "Biology Club",
+    "description": "A community for students interested in life sciences, research, and biology discussions.",
+    "category": "Academic",
+    "events": [
+      {
+        "id": "bio-seminar",
+        "title": "DNA Research Seminar",
+        "date": "2025-11-12",
+        "location": "Science Building 204",
+        "description": "Join us for a discussion on the latest DNA research and techniques."
+      },
+      {
+        "id": "eco-trip",
+        "title": "Field Trip to Botanical Garden",
+        "date": "2025-11-20",
+        "location": "Downtown Botanical Garden",
+        "description": "Explore local biodiversity with fellow students!"
+      }
+    ]
+  },
+  {
+    "id": "math-club",
+    "name": "Math Club",
+    "description": "Connecting math lovers through competitions, games, and tutoring sessions.",
+    "category": "Academic",
+    "events": [
+      {
+        "id": "math-night",
+        "title": "Trivia Night",
+        "date": "2025-11-18",
+        "location": "Room 305, Main Hall",
+        "description": "Test your math skills and win prizes!"
+      }
+    ]
+  }
+]
