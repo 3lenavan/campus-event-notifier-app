@@ -1,156 +1,156 @@
-// Imports
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { onAuthStateChanged } from "firebase/auth";
+import { useEffect, useMemo, useState } from "react";
 import {
-    addDoc,
-    collection,
-    doc,
-    getDoc,
-    serverTimestamp,
-    setDoc,
-} from "firebase/firestore";
-import { useEffect, useState } from "react";
-import {
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { auth, db } from "../FirebaseConfig";
+import { useAuthUser } from "../src/hooks/useAuthUser";
 import { notifyRSVPConfirmation } from "../src/lib/notifications";
+import { getLS, LS_KEYS } from "../src/lib/localStorage";
+import { listEvents } from "../src/services/eventsService";
+import type { Club, Event as EventModel } from "../src/types";
 
-// Event interface
-interface Event {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  location: string;
-  category: string;
-  attendees: number;
-  maxAttendees?: number;
-  imageUrl?: string;
-  isUserAttending?: boolean;
-  organizer?: string;
-  fullDescription?: string;
-}
-
-// Main Component
 export default function EventDetails() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuthUser();
 
-  // Event state
-  const [event, setEvent] = useState<Event | null>(null);
+  const [event, setEvent] = useState<EventModel | null>(null);
+  const [clubName, setClubName] = useState("Unknown Club");
   const [loading, setLoading] = useState(true);
+  const [isAttending, setIsAttending] = useState(false);
 
-  // Fetch event details
+  const eventId = Array.isArray(id) ? id[0] : id;
+
   useEffect(() => {
     const fetchEvent = async () => {
-      try {
-        const docRef = doc(db, "events", id as string);
-        const docSnap = await getDoc(docRef);
+      if (!eventId) {
+        setLoading(false);
+        return;
+      }
 
-        if (docSnap.exists()) {
-          setEvent({ ...(docSnap.data() as Event), id: docSnap.id });
+      try {
+        const events = await listEvents();
+        const found = events.find(evt => evt.id === eventId) ?? null;
+        setEvent(found);
+
+        if (found) {
+          const clubs = (await getLS<Club[]>(LS_KEYS.CLUBS, [])) ?? [];
+          const matchedClub = clubs.find(club => club.id === found.clubId);
+          setClubName(matchedClub?.name ?? "Unknown Club");
         } else {
-          console.log("No such event!");
+          setClubName("Unknown Club");
         }
       } catch (error) {
         console.error("Error fetching event:", error);
+        setEvent(null);
       } finally {
         setLoading(false);
       }
     };
+
     fetchEvent();
-  }, [id]);
+  }, [eventId]);
 
-  // Track logged-in user
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => setCurrentUser(user));
-    return () => unsubscribe();
-  }, []);
+  const eventDate = useMemo(() => {
+    if (!event) return null;
+    return new Date(event.dateISO);
+  }, [event]);
 
-  // Handle RSVP
-  const handleRSVP = async (eventId: string, eventTitle: string) => {
+  const formattedDate = eventDate
+    ? eventDate.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : "";
+
+  const formattedTime = eventDate
+    ? eventDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "";
+
+  const isEventPast = eventDate ? eventDate < new Date() : false;
+
+  const handleRSVP = async () => {
+    if (!event) {
+      return;
+    }
+
+    if (!user) {
+      Alert.alert("Login Required", "Please sign in to RSVP for this event.");
+      return;
+    }
+
+    const attendingNext = !isAttending;
+
+    if (attendingNext) {
+      try {
+        await notifyRSVPConfirmation(event.title);
+      } catch (error) {
+        console.error("Error sending RSVP notification:", error);
+      }
+      Alert.alert("RSVP Confirmed", `You RSVP'd for ${event.title}`);
+    } else {
+      Alert.alert("RSVP Cancelled", `Your RSVP for ${event.title} has been cancelled.`);
+    }
+
+    setIsAttending(attendingNext);
+  };
+
+  const handleAddToCalendar = (eventDetails: EventModel) => {
     try {
-      if (!currentUser) {
-        alert("Please log in to RSVP.");
+      if (typeof window === "undefined") {
+        Alert.alert("Not Supported", "Add to calendar is only available on web.");
         return;
       }
 
-      await setDoc(doc(db, "rsvps", `${currentUser.uid}_${eventId}`), {
-        userId: currentUser.uid,
-        eventId: eventId,
-        timestamp: serverTimestamp(),
-      });
+      const eventDateTime = new Date(eventDetails.dateISO);
+      const endDateTime = new Date(eventDateTime.getTime() + 2 * 60 * 60 * 1000);
 
-      await addDoc(collection(db, "notifications"), {
-        userId: currentUser.uid,
-        message: `You RSVP'd for ${eventTitle}!`,
-        timestamp: serverTimestamp(),
-        read: false,
-      });
+      const startTime = eventDateTime.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      const endTime = endDateTime.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 
-      alert(`You have RSVP'd for "${eventTitle}" successfully!`);
-      try { await notifyRSVPConfirmation(eventTitle); } catch {}
-    } catch (error) {
-      console.error("Error RSVPing:", error);
-      alert("Something went wrong. Please try again.");
-    }
-  };
+      const uid = `event-${eventDetails.id}-${Date.now()}`;
+      const description = (eventDetails.description ?? "").replace(/\r?\n/g, "\\n");
 
-  // Handle Add to Calendar
-  const handleAddToCalendar = (event: Event) => {
-    try {
-      // Create event date/time
-      const eventDateTime = new Date(`${event.date}T${event.time}`);
-      const startTime = eventDateTime.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-      const endTime = new Date(eventDateTime.getTime() + 2 * 60 * 60 * 1000) // Add 2 hours
-        .toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-      
-      // Generate unique ID
-      const uid = `event-${event.id}-${Date.now()}`;
-      
-      // Create ICS content
       const icsContent = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//Campus Event Notifier//EN',
-        'BEGIN:VEVENT',
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Campus Event Notifier//EN",
+        "BEGIN:VEVENT",
         `UID:${uid}`,
         `DTSTART:${startTime}`,
         `DTEND:${endTime}`,
-        `SUMMARY:${event.title}`,
-        `DESCRIPTION:${event.description}\\n\\nLocation: ${event.location}`,
-        `LOCATION:${event.location}`,
-        `STATUS:CONFIRMED`,
-        `TRANSP:OPAQUE`,
-        'END:VEVENT',
-        'END:VCALENDAR'
-      ].join('\r\n');
+        `SUMMARY:${eventDetails.title}`,
+        `DESCRIPTION:${description}\\n\\nLocation: ${eventDetails.location}`,
+        `LOCATION:${eventDetails.location}`,
+        "STATUS:CONFIRMED",
+        "TRANSP:OPAQUE",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n");
 
-      // Create and download the file
-      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
       const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
+
+      const link = document.createElement("a");
       link.href = url;
-      link.download = `${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
+      link.download = `${eventDetails.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.ics`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
-      alert('Calendar file downloaded successfully!');
+
+      Alert.alert("Calendar Event", "Calendar file downloaded successfully!");
     } catch (error) {
-      console.error('Error creating calendar file:', error);
-      alert('Failed to create calendar file. Please try again.');
+      console.error("Error creating calendar file:", error);
+      Alert.alert("Error", "Failed to create calendar file. Please try again.");
     }
   };
 
@@ -173,36 +173,8 @@ export default function EventDetails() {
     );
   }
 
-  // Helpers
-  const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  const getCategoryColor = (category: string): string => {
-    const colors: Record<string, string> = {
-      Academic: "#3B82F6",
-      Social: "#10B981",
-      Sports: "#EF4444",
-      Arts: "#A855F7",
-      Career: "#F97316",
-      Other: "#9CA3AF",
-    };
-    return colors[category] || colors["Other"];
-  };
-
-  const isEventFull =
-    event.maxAttendees && event.attendees >= event.maxAttendees;
-  const isEventPast = new Date(event.date) < new Date();
-
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -223,37 +195,21 @@ export default function EventDetails() {
         </View>
       </View>
 
-      {/* Banner */}
-      <View
-        style={[
-          styles.imageHeader,
-          { backgroundColor: getCategoryColor(event.category) },
-        ]}
-      >
-        {event.imageUrl ? (
-          <Image
-            source={{ uri: event.imageUrl }}
-            style={styles.eventImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.imageOverlay}>
-            <Text style={styles.title}>{event.title}</Text>
-            <View style={[styles.badge, { backgroundColor: "#FFF3" }]}>
-              <Text style={styles.badgeText}>{event.category}</Text>
-            </View>
+      <View style={[styles.imageHeader, { backgroundColor: "#3B82F6" }]}>
+        <View style={styles.imageOverlay}>
+          <Text style={styles.title}>{event.title}</Text>
+          <View style={[styles.badge, { backgroundColor: "#FFF3" }]}>
+            <Text style={styles.badgeText}>{clubName}</Text>
           </View>
-        )}
+        </View>
       </View>
 
-      {/* Content */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Info */}
         <View style={styles.card}>
           <View style={styles.infoRow}>
             <Ionicons name="calendar-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
-              <Text style={styles.infoTitle}>{formatDate(event.date)}</Text>
+              <Text style={styles.infoTitle}>{formattedDate}</Text>
               <Text style={styles.infoSubtitle}>Date</Text>
             </View>
           </View>
@@ -261,7 +217,7 @@ export default function EventDetails() {
           <View style={styles.infoRow}>
             <Ionicons name="time-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
-              <Text style={styles.infoTitle}>{event.time}</Text>
+              <Text style={styles.infoTitle}>{formattedTime}</Text>
               <Text style={styles.infoSubtitle}>Time</Text>
             </View>
           </View>
@@ -269,7 +225,7 @@ export default function EventDetails() {
           <View style={styles.infoRow}>
             <Ionicons name="location-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
-              <Text style={styles.infoTitle}>{event.location}</Text>
+              <Text style={styles.infoTitle}>{event.location || "Location TBD"}</Text>
               <Text style={styles.infoSubtitle}>Location</Text>
             </View>
           </View>
@@ -277,60 +233,44 @@ export default function EventDetails() {
           <View style={styles.infoRow}>
             <Ionicons name="people-outline" size={20} color="#6B7280" style={styles.icon} />
             <View>
-              <Text style={styles.infoTitle}>
-                {event.attendees} attending
-                {event.maxAttendees && ` / ${event.maxAttendees} max`}
-              </Text>
-              <Text style={styles.infoSubtitle}>Attendees</Text>
+              <Text style={styles.infoTitle}>{clubName}</Text>
+              <Text style={styles.infoSubtitle}>Club</Text>
             </View>
           </View>
         </View>
 
-        {/* Description */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>About this event</Text>
           <Text style={styles.description}>
-            {event.fullDescription || event.description}
+            {event.description || "No additional details provided."}
           </Text>
-
-          {event.organizer && (
-            <View style={styles.organizerBlock}>
-              <Text style={styles.sectionTitle}>Organizer</Text>
-              <Text style={styles.organizerText}>{event.organizer}</Text>
-            </View>
-          )}
         </View>
 
-        {/* RSVP */}
         <View style={styles.card}>
           {isEventPast ? (
             <TouchableOpacity style={[styles.button, styles.disabled]}>
               <Text style={styles.buttonText}>Event has ended</Text>
-            </TouchableOpacity>
-          ) : isEventFull && !event.isUserAttending ? (
-            <TouchableOpacity style={[styles.button, styles.disabled]}>
-              <Text style={styles.buttonText}>Event is full</Text>
             </TouchableOpacity>
           ) : (
             <>
               <TouchableOpacity
                 style={[
                   styles.button,
-                  event.isUserAttending ? styles.cancelButton : styles.rsvpButton,
+                  isAttending ? styles.cancelButton : styles.rsvpButton,
                 ]}
-                onPress={() => handleRSVP(event.id, event.title)}
+                onPress={handleRSVP}
               >
                 <Text
                   style={[
                     styles.buttonText,
-                    event.isUserAttending && styles.cancelText,
+                    isAttending && styles.cancelText,
                   ]}
                 >
-                  {event.isUserAttending ? "Cancel RSVP" : "RSVP to Event"}
+                  {isAttending ? "Cancel RSVP" : "RSVP to Event"}
                 </Text>
               </TouchableOpacity>
               <Text style={styles.rsvpNote}>
-                {event.isUserAttending
+                {isAttending
                   ? "You're attending this event"
                   : "Join other students at this event"}
               </Text>
@@ -338,7 +278,6 @@ export default function EventDetails() {
           )}
         </View>
 
-        {/* Add to Calendar */}
         <View style={styles.card}>
           <TouchableOpacity
             style={[styles.button, styles.calendarButton]}
@@ -356,7 +295,6 @@ export default function EventDetails() {
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -394,13 +332,6 @@ const styles = StyleSheet.create({
   infoSubtitle: { fontSize: 12, color: "#6B7280" },
   sectionTitle: { fontSize: 16, fontWeight: "600", marginBottom: 6 },
   description: { color: "#4B5563", fontSize: 14, lineHeight: 20 },
-  organizerBlock: {
-    marginTop: 14,
-    borderTopWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingTop: 10,
-  },
-  organizerText: { color: "#6B7280", fontSize: 14 },
   button: {
     borderRadius: 10,
     paddingVertical: 12,
@@ -418,7 +349,7 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 6,
   },
-  calendarButton: { 
+  calendarButton: {
     backgroundColor: "#10B981",
     flexDirection: "row",
     alignItems: "center",
@@ -433,5 +364,4 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 6,
   },
-  eventImage: { width: "100%", height: "100%" },
 });

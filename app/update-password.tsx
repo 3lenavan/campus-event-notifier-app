@@ -10,15 +10,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { auth } from "@/FirebaseConfig";
-import {
-  reauthenticateWithCredential,
-  updatePassword,
-  EmailAuthProvider,
-} from "firebase/auth";
+import type { AuthError } from "@supabase/supabase-js";
+import { mapSupabaseAuthError } from "../src/lib/auth";
+import { supabase } from "../src/lib/supabaseClient";
+import { useAuthUser } from "../src/hooks/useAuthUser";
 
 export default function UpdatePassword() {
-  const user = auth.currentUser;
+  const { user } = useAuthUser();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -26,7 +24,7 @@ export default function UpdatePassword() {
 
   // Handle password update
   const handleUpdatePassword = async () => {
-    if (!user || !user.email) {
+      if (!user || !user.email) {
       Alert.alert("Error", "You must be logged in to update your password.");
       return;
     }
@@ -48,35 +46,34 @@ export default function UpdatePassword() {
 
     try {
       // 🔐 Reauthenticate user first
-      const credential = EmailAuthProvider.credential(
-        user.email,
-        currentPassword
-      );
-      await reauthenticateWithCredential(user, credential);
+        const { error: verifyError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: currentPassword,
+        });
 
-      // ✅ Update password
-      await updatePassword(user, newPassword);
+        if (verifyError) {
+          const message = mapSupabaseAuthError(verifyError as AuthError, "signin");
+          Alert.alert("Error", message);
+          return;
+        }
 
-      // 🎉 Success message before redirect
-      Alert.alert(
-        "Password Updated",
-        "Your password has been successfully updated!",
-        [{ text: "OK", onPress: () => router.back() }]
-      );
-    } catch (error: any) {
-      console.error(error);
-      if (error.code === "auth/wrong-password") {
-        Alert.alert("Incorrect Password", "Your current password is incorrect.");
-      } else if (error.code === "auth/weak-password") {
-        Alert.alert("Weak Password", "Please choose a stronger password.");
-      } else if (error.code === "auth/requires-recent-login") {
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+
+        if (updateError) {
+          throw updateError;
+        }
+
         Alert.alert(
-          "Session Expired",
-          "Please log out and log in again before updating your password."
+          "Password Updated",
+          "Your password has been successfully updated!",
+          [{ text: "OK", onPress: () => router.back() }]
         );
-      } else {
-        Alert.alert("Error", error.message || "An unexpected error occurred.");
-      }
+      } catch (error) {
+        console.error(error);
+        const message = mapSupabaseAuthError(error as AuthError, "update-password");
+        Alert.alert("Error", message);
     }
   };
 

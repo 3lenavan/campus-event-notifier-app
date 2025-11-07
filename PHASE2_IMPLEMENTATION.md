@@ -2,14 +2,14 @@
 
 ## Overview
 
-Phase 2 of the Campus Event Notifier app has been successfully implemented with Firebase Authentication, local storage-only data management, and role-based club membership verification.
+Phase 2 of the Campus Event Notifier app has been successfully implemented with Supabase Authentication, local storage-only data management, and role-based club membership verification.
 
 ## Key Features Implemented
 
 ### 🔐 Authentication System
-- **Firebase Authentication** integration with email/password and Google OAuth
-- **Automatic user profile creation** from Firebase Auth data
-- **Session management** handled entirely by Firebase (no custom sessions)
+- **Supabase Authentication** integration with email/password (Google OAuth coming soon)
+- **Automatic user profile creation** from Supabase Auth data
+- **Session management** handled entirely by Supabase (no custom sessions)
 
 ### 🏛️ Local Storage Architecture
 - **Clubs**: Seeded from `snhu_clubs_with_hashes.json` with verification codes
@@ -33,7 +33,7 @@ Phase 2 of the Campus Event Notifier app has been successfully implemented with 
 ```
 src/
 ├── lib/
-│   ├── firebase.ts          # Firebase Auth configuration
+│   ├── supabaseClient.ts    # Supabase Auth configuration
 │   ├── localStorage.ts      # Local storage utilities
 │   └── hash.ts             # SHA-256 hashing utility
 ├── types/
@@ -105,7 +105,7 @@ interface Event {
 
 ### Profile Service
 - `getProfile(uid)`: Get user profile from local storage
-- `upsertProfileFromAuth(user)`: Create/update profile from Firebase user
+- `upsertProfileFromAuth(user)`: Create/update profile from Supabase user
 - `verifyClubMembership(uid, clubInput, codePlaintext)`: Verify and join club
 - `isClubMember(uid, clubId)`: Check membership status
 
@@ -124,14 +124,14 @@ interface Event {
 ## User Flows
 
 ### 1. App Initialization
-1. Firebase Auth initializes
+1. Supabase Auth initializes
 2. Club data seeds from JSON file (one-time only)
 3. Auth state listener activates
 4. User profile created/updated on sign-in
 
 ### 2. Authentication Flow
 1. User signs in with email/password or Google
-2. Firebase handles authentication
+2. Supabase handles authentication
 3. Local profile automatically created/updated
 4. User role defaults to "student"
 
@@ -162,14 +162,10 @@ interface Event {
 
 ## Environment Configuration
 
-The app supports environment variables for Firebase configuration:
-- `EXPO_PUBLIC_FIREBASE_API_KEY`
-- `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `EXPO_PUBLIC_FIREBASE_PROJECT_ID`
-- `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `EXPO_PUBLIC_FIREBASE_APP_ID`
-- `EXPO_PUBLIC_USE_FIREBASE_EMULATOR` (development only)
+The app supports environment variables for Supabase configuration:
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- (Optional) `EXPO_PUBLIC_SUPABASE_USE_LOCAL` for local CLI instances
 
 ## Dependencies Added
 

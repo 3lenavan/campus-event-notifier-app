@@ -1,9 +1,10 @@
 import { useTheme } from "@react-navigation/native";
 import { router } from "expo-router";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { useState } from "react";
 import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from "react-native";
-import { auth } from "../src/lib/firebase";
+import type { AuthError } from "@supabase/supabase-js";
+import { mapSupabaseAuthError } from "../src/lib/auth";
+import { supabase } from "../src/lib/supabaseClient";
 
 export default function Index() {
   const [email, setEmail] = useState("");
@@ -25,43 +26,21 @@ export default function Index() {
         alert("Password must be at least 6 characters long");
         return;
       }
-      const user = await signInWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
-      if (user) {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: emailTrimmed,
+        password: passwordTrimmed,
+      });
+
+      if (error) {
+        throw error;
+      }
+
         alert("Signed in successfully!");
         router.replace("/(tabs)/home");
-      }
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      
-      // Handle specific Firebase auth errors
-      let errorMessage = 'Sign in failed';
-      
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/user-not-found':
-            errorMessage = 'No account found with this email. Please sign up first.';
-            break;
-          case 'auth/wrong-password':
-            errorMessage = 'Incorrect password. Please try again.';
-            break;
-          case 'auth/invalid-email':
-            errorMessage = 'Please enter a valid email address.';
-            break;
-          case 'auth/user-disabled':
-            errorMessage = 'This account has been disabled.';
-            break;
-          case 'auth/too-many-requests':
-            errorMessage = 'Too many failed attempts. Please try again later.';
-            break;
-          case 'auth/network-request-failed':
-            errorMessage = 'Network error. Please check your internet connection.';
-            break;
-          default:
-            errorMessage = error.message || 'Sign in failed';
-        }
-      }
-      
-      alert(errorMessage);
+      const message = mapSupabaseAuthError(error as AuthError, "signin");
+      alert(message);
     }
   };
 
@@ -77,37 +56,33 @@ export default function Index() {
         alert("Password must be at least 6 characters long");
         return;
       }
-      const user = await createUserWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
-      if (user) {
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const { data, error } = await supabase.auth.signUp({
+        email: emailTrimmed,
+        password: passwordTrimmed,
+        options: {
+          data: {
+            full_name: fullName,
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.session) {
         alert("Account created successfully!");
         router.replace("/(tabs)/home");
+      } else {
+        alert("Account created! Check your email to verify your address.");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      
-      // Handle specific Firebase auth errors
-      let errorMessage = 'Account creation failed';
-      
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/email-already-in-use':
-            errorMessage = 'This email is already registered. Please sign in instead.';
-            break;
-          case 'auth/invalid-email':
-            errorMessage = 'Please enter a valid email address.';
-            break;
-          case 'auth/weak-password':
-            errorMessage = 'Password should be at least 6 characters long.';
-            break;
-          case 'auth/network-request-failed':
-            errorMessage = 'Network error. Please check your internet connection.';
-            break;
-          default:
-            errorMessage = error.message || 'Account creation failed';
-        }
-      }
-      
-      alert(errorMessage);
+      const message = mapSupabaseAuthError(error as AuthError, "signup");
+      alert(message);
     }
   };
   return (

@@ -4,10 +4,7 @@
     "strict": true,
     "jsx": "react-jsx",
     "paths": {
-      "firebase/auth": [ "./node_modules/@firebase/auth/dist/rn/index.rn.d.ts" ],
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     }
   },
   "include": [
@@ -15,6 +12,5 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-, "node_modules/superbaseClient.tsx"  ]
+  ]
 }
-

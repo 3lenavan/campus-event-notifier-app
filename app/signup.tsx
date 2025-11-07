@@ -1,9 +1,10 @@
 import { useTheme } from "@react-navigation/native";
 import { router } from "expo-router";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { useState } from "react";
 import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from "react-native";
-import { auth } from "../src/lib/firebase";
+import type { AuthError } from "@supabase/supabase-js";
+import { mapSupabaseAuthError } from "../src/lib/auth";
+import { supabase } from "../src/lib/supabaseClient";
 
 export default function Signup() {
   // Store form inputs
@@ -36,45 +37,34 @@ export default function Signup() {
         return;
       }
 
-      // Create user with email & password
-      const userCredential = await createUserWithEmailAndPassword(auth, emailTrimmed, passwordTrimmed);
+        const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
-      // ✅ Save full name into displayName
-      await updateProfile(userCredential.user, {
-        displayName: `${firstName.trim()} ${lastName.trim()}`,
-      });
+        const { data, error } = await supabase.auth.signUp({
+          email: emailTrimmed,
+          password: passwordTrimmed,
+          options: {
+            data: {
+              full_name: fullName,
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+            },
+          },
+        });
 
-      console.log("User registered:", userCredential.user);
-      alert("Account created successfully!");
-
-      // Redirect to home (inside tabs)
-      router.replace("/(tabs)/home");
-    } catch (error: any) {
-      console.error(error);
-      
-      // Handle specific Firebase auth errors
-      let errorMessage = 'Account creation failed';
-      
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/email-already-in-use':
-            errorMessage = 'This email is already registered. Please sign in instead.';
-            break;
-          case 'auth/invalid-email':
-            errorMessage = 'Please enter a valid email address.';
-            break;
-          case 'auth/weak-password':
-            errorMessage = 'Password should be at least 6 characters long.';
-            break;
-          case 'auth/network-request-failed':
-            errorMessage = 'Network error. Please check your internet connection.';
-            break;
-          default:
-            errorMessage = error.message || 'Account creation failed';
+        if (error) {
+          throw error;
         }
-      }
-      
-      alert(errorMessage);
+
+        if (data?.session) {
+          alert("Account created successfully!");
+          router.replace("/(tabs)/home");
+        } else {
+          alert("Account created! Check your email to verify your address.");
+        }
+      } catch (error) {
+        console.error(error);
+        const message = mapSupabaseAuthError(error as AuthError, "signup");
+        alert(message);
     }
   };
 

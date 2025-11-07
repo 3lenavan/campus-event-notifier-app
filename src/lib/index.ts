@@ -3,4 +3,4 @@ export * from './eventValidators';
 export * from './notifications';
 export * from './localStorage';
 export * from './hash';
-export * from './firebase';
+export * from './auth';

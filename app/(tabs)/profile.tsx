@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
-import { auth } from "../../src/lib/firebase";
+import { supabase } from "../../src/lib/supabaseClient";
 import { getLS, LS_KEYS } from "../../src/lib/localStorage";
 import { Club } from "../../src/types";
 
@@ -25,9 +25,12 @@ const Profile = () => {
     loadClubs();
   }, []);
 
-  const handleSignOut = async () => {
+    const handleSignOut = async () => {
     try {
-      await auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw error;
+      }
       Alert.alert('Success', 'Signed out successfully');
     } catch (error) {
       console.error('Sign out error:', error);

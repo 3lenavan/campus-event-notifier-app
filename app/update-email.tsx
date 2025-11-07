@@ -10,22 +10,20 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { auth } from "@/FirebaseConfig";
-import {
-  updateEmail,
-  reauthenticateWithCredential,
-  EmailAuthProvider,
-} from "firebase/auth";
+import type { AuthError } from "@supabase/supabase-js";
+import { mapSupabaseAuthError } from "../src/lib/auth";
+import { supabase } from "../src/lib/supabaseClient";
+import { useAuthUser } from "../src/hooks/useAuthUser";
 
 export default function UpdateEmail() {
-  const user = auth.currentUser;
+  const { user } = useAuthUser();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [confirmEmail, setConfirmEmail] = useState("");
 
   const handleUpdateEmail = async () => {
-    if (!user) {
+      if (!user || !user.email) {
       Alert.alert("Error", "You must be logged in to update your email.");
       return;
     }
@@ -41,38 +39,36 @@ export default function UpdateEmail() {
     }
 
     try {
-      // 🔐 Step 1: Re-authenticate the user
-      const credential = EmailAuthProvider.credential(
-        user.email!,
-        currentPassword
-      );
-      await reauthenticateWithCredential(user, credential);
+        const currentEmail = user.email;
 
-      // ✉️ Step 2: Update the email
-      await updateEmail(user, newEmail.trim());
+        const { error: verifyError } = await supabase.auth.signInWithPassword({
+          email: currentEmail,
+          password: currentPassword,
+        });
 
-      Alert.alert(
-        "Email Updated",
-        "Your email has been successfully updated!",
-        [{ text: "OK", onPress: () => router.back() }]
-      );
-    } catch (error: any) {
-      console.error(error);
-      if (error.code === "auth/wrong-password") {
+        if (verifyError) {
+          const message = mapSupabaseAuthError(verifyError as AuthError, "signin");
+          Alert.alert("Error", message);
+          return;
+        }
+
+        const { error: updateError } = await supabase.auth.updateUser({
+          email: newEmail.trim(),
+        });
+
+        if (updateError) {
+          throw updateError;
+        }
+
         Alert.alert(
-          "Incorrect Password",
-          "The password you entered is incorrect. Please try again."
+          "Email Updated",
+          "If required, please check your new inbox to confirm this change.",
+          [{ text: "OK", onPress: () => router.back() }]
         );
-      } else if (error.code === "auth/invalid-email") {
-        Alert.alert("Invalid Email", "Please enter a valid email address.");
-      } else if (error.code === "auth/requires-recent-login") {
-        Alert.alert(
-          "Session Expired",
-          "Please log out and log in again before updating your email."
-        );
-      } else {
-        Alert.alert("Error", error.message || "Failed to update email.");
-      }
+      } catch (error) {
+        console.error(error);
+        const message = mapSupabaseAuthError(error as AuthError, "update-email");
+        Alert.alert("Error", message);
     }
   };
 
@@ -100,11 +96,11 @@ export default function UpdateEmail() {
 
         {/* Current Email */}
         <Text style={styles.label}>Current Email</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: "#f3f4f6" }]}
-          value={user?.email || ""}
-          editable={false}
-        />
+          <TextInput
+            style={[styles.input, { backgroundColor: "#f3f4f6" }]}
+            value={user?.email || ""}
+            editable={false}
+          />
 
         {/* Password Field */}
         <Text style={styles.label}>Current Password</Text>

@@ -9,79 +9,76 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { auth, db } from "../FirebaseConfig";
-import {
-  doc,
-  getDoc,
-  collection,
-  getDocs,
-  query,
-  where,
-  setDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-import EventCard from "./event-card";
+import { useAuthUser } from "../src/hooks/useAuthUser";
+import { getLS, LS_KEYS } from "../src/lib/localStorage";
+import { listClubEvents } from "../src/services/eventsService";
+import { notifyRSVPConfirmation } from "../src/lib/notifications";
+import EventCard, { Event as EventCardEvent } from "./event-card";
 
-// Firestore types
-interface Club {
+type ClubDetails = {
   id: string;
   name: string;
   description: string;
   category: string;
   imageUrl?: string;
-}
+};
 
-interface Event {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  location: string;
-  category: string;
-  attendees: number;
-  maxAttendees?: number;
-  imageUrl?: string;
-  clubId: string;
-  clubName: string;
-}
+type ClubEventCard = EventCardEvent & { dateISO: string };
 
 export default function ClubDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const [club, setClub] = useState<Club | null>(null);
-  const [events, setEvents] = useState<Event[]>([]);
+  const { user } = useAuthUser();
+  const [club, setClub] = useState<ClubDetails | null>(null);
+  const [events, setEvents] = useState<ClubEventCard[]>([]);
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchClubAndEvents = async () => {
       try {
-        // Fetch club head
-        const clubDoc = await getDoc(doc(db, "clubs", id as string));
-        if (clubDoc.exists()) {
-          const data = clubDoc.data() as Club;
-          const { id: _, ...rest } = data; // Avoid duplicate id
-          setClub({ id: clubDoc.id, ...rest });
+        if (!id) {
+          setLoading(false);
+          return;
         }
 
-        // Fetch events for this club
-        const eventsRef = collection(db, "events");
-        const q = query(eventsRef, where("clubId", "==", id));
-        const eventSnap = await getDocs(q);
+        const clubsStored = (await getLS<any[]>(LS_KEYS.CLUBS, [])) ?? [];
+        const matchedClub = clubsStored.find((clubItem) => clubItem.id === id);
 
-        const eventData = eventSnap.docs.map((d) => {
-          const data = d.data() as Event;
-          const { id: _, ...rest } = data;
-          return { id: d.id, ...rest };
-        });
+        if (matchedClub) {
+          setClub({
+            id: matchedClub.id,
+            name: matchedClub.name,
+            description: matchedClub.description ?? "No description available.",
+            category: matchedClub.category ?? "Other",
+            imageUrl: matchedClub.imageUrl,
+          });
+        }
 
-        const sortedEvents = eventData.sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
+        const clubEvents = await listClubEvents(id);
+        const approvedEvents = clubEvents
+          .filter((evt) => evt.status === "approved")
+          .map<ClubEventCard>((evt) => {
+            const date = new Date(evt.dateISO);
+            return {
+              id: evt.id,
+              title: evt.title,
+              description: evt.description,
+              date: evt.dateISO,
+              time: date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              location: evt.location,
+              category: "Club Event",
+              attendees: 0,
+              maxAttendees: undefined,
+              imageUrl: undefined,
+              isUserAttending: false,
+              dateISO: evt.dateISO,
+            };
+          })
+          .sort((a, b) => new Date(a.dateISO).getTime() - new Date(b.dateISO).getTime());
 
-        setEvents(sortedEvents);
+        setEvents(approvedEvents);
       } catch (err) {
         console.error("Error fetching club or events:", err);
       } finally {
@@ -107,20 +104,18 @@ export default function ClubDetailsScreen() {
   const eventsToShow = showAllEvents ? events : events.slice(0, 3);
   const hasMore = events.length > 3;
 
-  // Handle RSVP action
   const handleRSVP = async (eventId: string, eventTitle: string) => {
     try {
-      const user = auth.currentUser;
       if (!user) {
         alert("Please log in to RSVP.");
         return;
       }
 
-      await setDoc(doc(db, "rsvps", `${user.uid}_${eventId}`), {
-        userId: user.uid,
-        eventId: eventId,
-        timestamp: serverTimestamp(),
-      });
+      try {
+        await notifyRSVPConfirmation(eventTitle);
+      } catch (error) {
+        console.error("Error sending RSVP notification:", error);
+      }
 
       alert(`You have RSVP’d for “${eventTitle}” successfully!`);
     } catch (error) {

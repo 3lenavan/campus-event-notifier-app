@@ -1,4 +1,4 @@
-import { User } from 'firebase/auth';
+import { User } from '@supabase/supabase-js';
 import { ADMIN_EMAILS } from '../lib/constants';
 import { sha256 } from '../lib/hash';
 import { getLS, LS_KEYS, setLS } from '../lib/localStorage';
@@ -18,20 +18,24 @@ export const getProfile = async (uid: string): Promise<UserProfile | null> => {
 };
 
 /**
- * Create or update user profile from Firebase Auth user
+ * Create or update user profile from Supabase Auth user
  */
 export const upsertProfileFromAuth = async (user: User): Promise<UserProfile> => {
   try {
     const userProfiles = await getLS<Record<string, UserProfile>>(LS_KEYS.USER_PROFILES, {});
-    
-    let profile = userProfiles[user.uid];
+    const userId = user.id;
+    let profile = userProfiles[userId];
     const emailNormalized = (user.email || '').trim().toLowerCase();
-    
+
     if (!profile) {
       // Create new profile for first-time user
       profile = {
-        uid: user.uid,
-        name: user.displayName || user.email?.split('@')[0] || 'Unknown User',
+        uid: userId,
+        name:
+          (user.user_metadata?.full_name as string | undefined)?.trim() ||
+          (user.user_metadata?.name as string | undefined)?.trim() ||
+          user.email?.split('@')[0] ||
+          'Unknown User',
         email: emailNormalized,
         role: 'student',
         memberships: [],
@@ -39,13 +43,16 @@ export const upsertProfileFromAuth = async (user: User): Promise<UserProfile> =>
       };
     } else {
       // Update existing profile with latest auth data
-      profile.name = user.displayName || profile.name;
+      const derivedName =
+        (user.user_metadata?.full_name as string | undefined)?.trim() ||
+        (user.user_metadata?.name as string | undefined)?.trim();
+      profile.name = derivedName || profile.name;
       profile.email = emailNormalized || profile.email;
       profile.isAdmin = ADMIN_EMAILS.includes(emailNormalized);
     }
-    
+
     // Save back to Local Storage
-    userProfiles[user.uid] = profile;
+    userProfiles[userId] = profile;
     await setLS(LS_KEYS.USER_PROFILES, userProfiles);
     
     return profile;

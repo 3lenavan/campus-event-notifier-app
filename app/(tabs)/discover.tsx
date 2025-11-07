@@ -1,7 +1,5 @@
 import { useRouter } from "expo-router";
 import React, { useState, useEffect } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../FirebaseConfig";
 import {
   View,
   Text,
@@ -12,50 +10,51 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import type { Club as BaseClub } from "../../src/types";
+import { getLS, LS_KEYS } from "../../src/lib/localStorage";
+import { listApprovedEvents } from "../../src/services/eventsService";
+import type { Event as EventModel } from "../../src/types";
 
-// Firestore Interfaces
-interface Club {
-  id: string;
-  name: string;
+type DiscoverClub = BaseClub & {
   description: string;
-  category: string;
   imageUrl?: string;
-}
+};
 
-interface Event {
+interface DiscoverEvent {
   id: string;
-  title: string;
   clubId: string;
-  date: string;
+  dateISO: string;
 }
 
 export default function Discover() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [clubs, setClubs] = useState<Club[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
+  const [clubs, setClubs] = useState<DiscoverClub[]>([]);
+  const [events, setEvents] = useState<DiscoverEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Fetch clubs + events from Firestore
+  // ✅ Fetch clubs + events from local storage/services
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const clubSnap = await getDocs(collection(db, "clubs"));
-        const clubData = clubSnap.docs.map((doc) => {
-          const data = doc.data() as Club;
-          const { id: _, ...rest } = data; // remove Firestore field id if exists
-          return { id: doc.id, ...rest };
-        });
+        const clubsStored = (await getLS<any[]>(LS_KEYS.CLUBS, [])) ?? [];
+        const normalizedClubs: DiscoverClub[] = clubsStored.map((club) => ({
+          id: club.id,
+          name: club.name,
+          description: club.description ?? "No description available.",
+          category: club.category ?? "Other",
+          imageUrl: club.imageUrl,
+        }));
 
-        const eventSnap = await getDocs(collection(db, "events"));
-        const eventData = eventSnap.docs.map((doc) => {
-          const data = doc.data() as Event;
-          const { id: _, ...rest } = data;
-          return { id: doc.id, ...rest };
-        });
+        const approvedEvents: EventModel[] = await listApprovedEvents();
+        const normalizedEvents: DiscoverEvent[] = approvedEvents.map((evt) => ({
+          id: evt.id,
+          clubId: evt.clubId,
+          dateISO: evt.dateISO,
+        }));
 
-        setClubs(clubData);
-        setEvents(eventData);
+        setClubs(normalizedClubs);
+        setEvents(normalizedEvents);
       } catch (error) {
         console.error("Error loading clubs/events:", error);
       } finally {

@@ -1,10 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import {
-    createUserWithEmailAndPassword,
-    GoogleAuthProvider,
-    signInWithEmailAndPassword,
-    signInWithPopup
-} from 'firebase/auth';
+import type { AuthError } from '@supabase/supabase-js';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
@@ -17,7 +12,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { auth } from '../lib/firebase';
+import { mapSupabaseAuthError } from '../lib/auth';
+import { supabase } from '../lib/supabaseClient';
 
 interface LoginProps {
   onSuccess?: () => void;
@@ -30,20 +26,23 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const [isSignUp, setIsSignUp] = useState(false);
 
   const handleEmailAuth = async () => {
-    if (!email || !password) {
+    const emailTrimmed = email.trim();
+    const passwordTrimmed = password.trim();
+
+    if (!emailTrimmed || !passwordTrimmed) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(emailTrimmed)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
     // Basic password validation
-    if (password.length < 6) {
+    if (passwordTrimmed.length < 6) {
       Alert.alert('Error', 'Password must be at least 6 characters long');
       return;
     }
@@ -51,101 +50,47 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
     setLoading(true);
     try {
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, email, password);
-        Alert.alert('Success', 'Account created successfully!');
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-        Alert.alert('Success', 'Signed in successfully!');
-      }
-      onSuccess?.();
-    } catch (error: any) {
-      console.error('Auth error:', error);
-      
-      // Handle specific Firebase auth errors
-      let errorMessage = 'Authentication failed';
-      
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/email-already-in-use':
-            errorMessage = 'This email is already registered. Please sign in instead.';
-            break;
-          case 'auth/invalid-email':
-            errorMessage = 'Please enter a valid email address.';
-            break;
-          case 'auth/weak-password':
-            errorMessage = 'Password should be at least 6 characters long.';
-            break;
-          case 'auth/user-not-found':
-            errorMessage = 'No account found with this email. Please sign up first.';
-            break;
-          case 'auth/wrong-password':
-            errorMessage = 'Incorrect password. Please try again.';
-            break;
-          case 'auth/user-disabled':
-            errorMessage = 'This account has been disabled.';
-            break;
-          case 'auth/too-many-requests':
-            errorMessage = 'Too many failed attempts. Please try again later.';
-            break;
-          case 'auth/network-request-failed':
-            errorMessage = 'Network error. Please check your internet connection.';
-            break;
-          default:
-            errorMessage = error.message || 'Authentication failed';
+        const { data, error } = await supabase.auth.signUp({
+          email: emailTrimmed,
+          password: passwordTrimmed,
+        });
+
+        if (error) {
+          throw error;
         }
+
+        const successMessage = data?.session
+          ? 'Account created successfully!'
+          : 'Account created! Check your email to verify your address.';
+        Alert.alert('Success', successMessage);
+
+        if (data?.session) {
+          onSuccess?.();
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: emailTrimmed,
+          password: passwordTrimmed,
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        Alert.alert('Success', 'Signed in successfully!');
+        onSuccess?.();
       }
-      
+    } catch (err) {
+      console.error('Auth error:', err);
+      const errorMessage = mapSupabaseAuthError(err as AuthError, isSignUp ? 'signup' : 'signin');
       Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleAuth = async () => {
-    setLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      
-      // For web, use popup; for mobile, use redirect
-      if (Platform.OS === 'web') {
-        await signInWithPopup(auth, provider);
-        Alert.alert('Success', 'Signed in with Google!');
-        onSuccess?.();
-      } else {
-        // For React Native, you might need to use a different approach
-        // This is a simplified version - you may need to implement proper Google Sign-In
-        Alert.alert('Info', 'Google Sign-In is only available on web. Please use email/password sign-in on mobile.');
-        return;
-      }
-    } catch (error: any) {
-      console.error('Google auth error:', error);
-      
-      // Handle specific Google auth errors
-      let errorMessage = 'Google Sign-In failed';
-      
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/popup-closed-by-user':
-            errorMessage = 'Sign-in cancelled. Please try again.';
-            break;
-          case 'auth/popup-blocked':
-            errorMessage = 'Popup blocked by browser. Please allow popups and try again.';
-            break;
-          case 'auth/cancelled-popup-request':
-            errorMessage = 'Sign-in cancelled. Please try again.';
-            break;
-          case 'auth/network-request-failed':
-            errorMessage = 'Network error. Please check your internet connection.';
-            break;
-          default:
-            errorMessage = error.message || 'Google Sign-In failed';
-        }
-      }
-      
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setLoading(false);
-    }
+  const handleGoogleAuth = () => {
+    Alert.alert('Info', 'Google Sign-In is coming soon. Please continue with email and password for now.');
   };
 
   return (

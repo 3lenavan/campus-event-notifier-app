@@ -1,7 +1,6 @@
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { User } from '@supabase/supabase-js';
 import { useCallback, useEffect, useState } from 'react';
-import { auth } from '../lib/firebase';
-import { initializeNotifications } from '../lib/notifications';
+import { supabase } from '../lib/supabaseClient';
 import { getProfile, upsertProfileFromAuth } from '../services/profileService';
 import { UserProfile } from '../types';
 
@@ -14,19 +13,20 @@ interface AuthState {
 
 /**
  * Hook to manage authentication state and user profile
- * Externalizes Firebase Auth state and automatically creates/updates local user profiles
+ * Externalizes Supabase Auth state and automatically creates/updates local user profiles
  */
 export const useAuthUser = (): AuthState => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = useCallback(async (firebaseUser: User) => {
+  const loadProfile = useCallback(async (authUser: User) => {
     try {
-      const userProfile = await upsertProfileFromAuth(firebaseUser);
+      const userProfile = await upsertProfileFromAuth(authUser);
       setProfile(userProfile);
     } catch (error) {
       console.error('Error loading profile:', error);
+      throw error;
     }
   }, []);
 
@@ -34,7 +34,7 @@ export const useAuthUser = (): AuthState => {
     if (!user) return;
     try {
       // Reload profile from storage (which may have been updated by verification)
-      const updatedProfile = await getProfile(user.uid);
+      const updatedProfile = await getProfile(user.id);
       if (updatedProfile) {
         setProfile(updatedProfile);
       } else {
@@ -47,34 +47,60 @@ export const useAuthUser = (): AuthState => {
   }, [user, loadProfile]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          // User is signed in - create or update local profile
-          await loadProfile(firebaseUser);
-          setUser(firebaseUser);
-          // Initialize notifications after login
-          try {
-            await initializeNotifications(firebaseUser.uid);
-          } catch (e) {
-            console.error('Failed to initialize notifications', e);
+    let isMounted = true;
+
+    const handleAuthChange = async (authUser: User | null) => {
+      if (!isMounted) return;
+
+      if (authUser) {
+        setUser(authUser);
+        try {
+          await loadProfile(authUser);
+        } catch (error) {
+          console.error('Error handling auth state change:', error);
+          if (isMounted) {
+            setUser(null);
+            setProfile(null);
           }
-        } else {
-          // User is signed out
-          setUser(null);
-          setProfile(null);
         }
-      } catch (error) {
-        console.error('Error handling auth state change:', error);
-        // On error, clear state
+      } else {
         setUser(null);
         setProfile(null);
-      } finally {
-        setLoading(false);
       }
+    };
+
+    const syncInitialSession = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error retrieving auth session:', error);
+        }
+        await handleAuthChange(data?.session?.user ?? null);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setLoading(true);
+      void handleAuthChange(session?.user ?? null).finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
     });
 
-    return unsubscribe;
+    syncInitialSession();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [loadProfile]);
 
   return { user, profile, loading, refreshProfile };

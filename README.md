@@ -42,6 +42,17 @@ To learn more about developing your project with Expo, look at the following res
 - [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
 - [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
+## Environment variables
+
+Authentication is powered by Supabase. Create a `.env` file (or configure the equivalent in your build tooling) with the following variables so the app can connect to your Supabase project:
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=your-project-url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-key
+```
+
+Restart the Expo dev server after making changes to ensure the values are picked up by Metro.
+
 ## Join the community
 
 Join our community of developers creating universal apps.
