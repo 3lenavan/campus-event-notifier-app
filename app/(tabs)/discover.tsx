@@ -1,7 +1,5 @@
 import { useRouter } from "expo-router";
 import React, { useState, useEffect } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../FirebaseConfig";
 import {
   View,
   Text,
@@ -13,71 +11,37 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-// Firestore Interfaces
-interface Club {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  imageUrl?: string;
-}
-
-interface Event {
-  id: string;
-  title: string;
-  clubId: string;
-  date: string;
-}
+// Import data and types from dataLoader
+import { getClubs, Club } from "../../data/dataLoader";
 
 export default function Discover() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [clubs, setClubs] = useState<Club[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Fetch clubs + events from Firestore
+  // Load clubs from JSON using dataLoader
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const clubSnap = await getDocs(collection(db, "clubs"));
-        const clubData = clubSnap.docs.map((doc) => {
-          const data = doc.data() as Club;
-          const { id: _, ...rest } = data; // remove Firestore field id if exists
-          return { id: doc.id, ...rest };
-        });
+  const data = getClubs();
+  setClubs(data);
+  setLoading(false);
+}, []);
 
-        const eventSnap = await getDocs(collection(db, "events"));
-        const eventData = eventSnap.docs.map((doc) => {
-          const data = doc.data() as Event;
-          const { id: _, ...rest } = data;
-          return { id: doc.id, ...rest };
-        });
+  // Filter by search input
+  const filteredClubs = clubs.filter((club) => {
+    const name = club.name?.toLowerCase() ?? "";
+    const category = club.category?.toLowerCase() ?? "";
+    const description = club.description?.toLowerCase() ?? "";
+    return (
+      name.includes(searchQuery.toLowerCase()) ||
+      category.includes(searchQuery.toLowerCase()) ||
+      description.includes(searchQuery.toLowerCase())
+    );
+  });
 
-        setClubs(clubData);
-        setEvents(eventData);
-      } catch (error) {
-        console.error("Error loading clubs/events:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const getEventCount = (club: Club) => club.events?.length || 0;
 
-    fetchData();
-  }, []);
-
-  // ✅ Filter by search input
-  const filteredClubs = clubs.filter(
-    (club) =>
-      club.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      club.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      club.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const getEventCount = (clubId: string) =>
-    events.filter((event) => event.clubId === clubId).length;
-
-  // ✅ Category color mapping
+  // Category color mapping
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
       Academic: "#3B82F6",
@@ -108,7 +72,7 @@ export default function Discover() {
         </View>
       </View>
 
-      {/* ✅ Search Bar */}
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons
           name="search-outline"
@@ -125,7 +89,7 @@ export default function Discover() {
         />
       </View>
 
-      {/* ✅ Club List */}
+      {/* Club List */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {filteredClubs.length === 0 ? (
           <View style={styles.emptyState}>
@@ -140,7 +104,7 @@ export default function Discover() {
               style={styles.clubCard}
               onPress={() =>
                 router.push({
-                  pathname: "/club-details-screen",
+                  pathname: "/clubs/[id]" as any, // fix Expo Router typing
                   params: { id: club.id },
                 })
               }
@@ -156,7 +120,7 @@ export default function Discover() {
                 <View
                   style={[
                     styles.clubImagePlaceholder,
-                    { backgroundColor: getCategoryColor(club.category) },
+                    { backgroundColor: getCategoryColor(club.category || "Other") },
                   ]}
                 >
                   <Text style={styles.clubIconText}>
@@ -169,23 +133,23 @@ export default function Discover() {
               <View style={styles.clubInfo}>
                 <Text style={styles.clubName}>{club.name}</Text>
                 <Text style={styles.clubDescription}>
-                  {club.description.length > 80
+                  {club.description && club.description.length > 80
                     ? club.description.substring(0, 80) + "..."
-                    : club.description}
+                    : club.description || "No description available"}
                 </Text>
 
                 <View style={styles.badgeRow}>
                   <View
                     style={[
                       styles.categoryBadge,
-                      { backgroundColor: getCategoryColor(club.category) },
+                      { backgroundColor: getCategoryColor(club.category || "Other") },
                     ]}
                   >
                     <Text style={styles.categoryText}>{club.category}</Text>
                   </View>
                   <Text style={styles.eventCount}>
-                    {getEventCount(club.id)} upcoming event
-                    {getEventCount(club.id) !== 1 ? "s" : ""}
+                    {getEventCount(club)} upcoming event
+                    {getEventCount(club) !== 1 ? "s" : ""}
                   </Text>
                 </View>
               </View>
@@ -197,7 +161,7 @@ export default function Discover() {
   );
 }
 
-// ✅ Styles
+// Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -212,8 +176,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 22, fontWeight: "bold", color: "#111827" },
   headerSubtitle: { fontSize: 13, color: "#6B7280" },
-
-  // ✅ Better Search Bar
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -238,13 +200,10 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
   },
   searchIcon: { marginRight: 4 },
-
   scrollContent: { padding: 16, paddingBottom: 120 },
   emptyState: { alignItems: "center", marginTop: 60 },
   emptyText: { color: "#6B7280", fontSize: 15 },
   emptySubText: { fontSize: 12, color: "#9CA3AF", marginTop: 4 },
-
-  // ✅ Card Styling
   clubCard: {
     backgroundColor: "white",
     borderRadius: 16,

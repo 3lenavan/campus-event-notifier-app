@@ -1,4 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
+import { getAuth } from "firebase/auth";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
@@ -18,13 +19,16 @@ type FeedEvent = BaseEvent & {
 };
 
 export default function HomeScreen() {
-  const { user, profile, loading } = useAuthUser();
-
+  const { user, profile } = useAuthUser();
+  
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace("/");
-    }
-  }, [loading, user]);
+    const unsub = getAuth().onAuthStateChanged((user) => {
+      if (!user) {
+        router.replace("/");
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,28 +37,26 @@ export default function HomeScreen() {
     try {
       const approved = await listApprovedEvents();
       const clubs = (await getLS<any[]>(LS_KEYS.CLUBS, [])) || [];
-      const eventsMapped: FeedEvent[] = approved
-        .map((event) => {
-          const date = new Date(event.dateISO);
-          return {
-            id: event.id,
-            title: event.title,
-            description: event.description,
-            date: date.toISOString(),
-            time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
-            location: event.location,
-            category: "Club Event",
-            attendees: 0,
-            maxAttendees: undefined,
-            imageUrl: undefined,
-            isUserAttending: false,
-            likes: 0,
-            liked: false,
-            favorited: false,
-            club: { id: event.clubId, name: clubs.find((c: any) => c.id === event.clubId)?.name || "Unknown Club" },
-          };
-        })
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const eventsMapped: FeedEvent[] = approved.map((event) => {
+        const date = new Date(event.dateISO);
+        return {
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          date: date.toISOString(),
+          time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+          location: event.location,
+          category: "Club Event",
+          attendees: 0,
+          maxAttendees: undefined,
+          imageUrl: undefined,
+          isUserAttending: false,
+          likes: 0,
+          liked: false,
+          favorited: false,
+          club: { id: event.clubId, name: clubs.find((c:any)=>c.id===event.clubId)?.name || "Unknown Club" },
+        };
+      }).sort((a,b)=> new Date(a.date).getTime() - new Date(b.date).getTime());
       setEvents(eventsMapped);
     } catch (e) {
       console.error("Error loading approved events:", e);

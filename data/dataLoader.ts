@@ -20,12 +20,12 @@ export interface Club {
   [key: string]: any; // allows extra fields (like hashes)
 }
 
-// ✅ Return all clubs
+// Return all clubs
 export const getClubs = (): Club[] => {
   return clubsData as Club[];
 };
 
-// ✅ Return all events flattened with their club ID
+// Return all events flattened with their club ID
 export const getAllEvents = (): Event[] => {
   const data = clubsData as Club[];
   const events: Event[] = [];
@@ -41,7 +41,7 @@ export const getAllEvents = (): Event[] => {
   return events;
 };
 
-// ✅ Return a single club by ID
+// Return a single club by ID
 export const getClubById = (id: string): Club | undefined => {
   return (clubsData as Club[]).find((club) => club.id === id);
 };
