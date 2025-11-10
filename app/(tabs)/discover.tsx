@@ -20,12 +20,22 @@ export default function Discover() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load clubs from JSON using dataLoader
+  // Load club data from Supabase when the Discover screen first mounts
+// Replaces the old JSON-based loader to fetch live data from the database
   useEffect(() => {
-  const data = getClubs();
-  setClubs(data);
-  setLoading(false);
+  async function loadClubs() {
+    try {
+      const data = await getClubs(); // fetches from Supabase
+      setClubs(data || []);
+    } catch (error) {
+      console.error("Error loading clubs:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+  loadClubs();
 }, []);
+
 
   // Filter by search input
   const filteredClubs = clubs.filter((club) => {
@@ -110,24 +120,17 @@ export default function Discover() {
               }
             >
               {/* Club Image or Placeholder */}
-              {club.imageUrl ? (
-                <Image
-                  source={{ uri: club.imageUrl }}
-                  style={styles.clubImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.clubImagePlaceholder,
-                    { backgroundColor: getCategoryColor(club.category || "Other") },
-                  ]}
-                >
-                  <Text style={styles.clubIconText}>
-                    {club.name[0].toUpperCase()}
-                  </Text>
-                </View>
-              )}
+              <Image
+  source={{
+    uri:
+      club.imageUrl && club.imageUrl.startsWith("http")
+        ? club.imageUrl
+        : "https://via.placeholder.com/300x150.png?text=Club+Image",
+  }}
+    style={styles.clubImage}
+  resizeMode="cover"
+/>
+
 
               {/* Club Info */}
               <View style={styles.clubInfo}>

@@ -1,21 +1,40 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
-import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getClubById } from "../../data/dataLoader";
+import { getClubByIdSupabase, getEventsByClub, Club } from "../../data/dataLoader";
 
 export default function ClubDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const club = id ? getClubById(id) : undefined;
+  const [club, setClub] = useState<Club | null>(null);
+  const [loading, setLoading] = useState(true); // Added loading state
 
+  // Load both club info and events
+  useEffect(() => {
+    const load = async () => {
+      if (!id) return;
+      const numericId = Number(id);
+      const c = await getClubByIdSupabase(numericId);
+      const e = await getEventsByClub(numericId);
+      if (c) c.events = e;
+      setClub(c);
+      setLoading(false); // Done loading
+    };
+    load();
+  }, [id]);
+
+  // Loading screen
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.notFound}>Loading club...</Text>
+      </View>
+    );
+  }
+
+  // Only show this if fetch finished and nothing found
   if (!club) {
     return (
       <View style={styles.center}>
@@ -26,20 +45,10 @@ export default function ClubDetails() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: club.name,
-          headerShown: false, // hide default header
-        }}
-      />
-      {/* SafeAreaView ensures content doesn’t overlap with status bar/notch */}
+      <Stack.Screen options={{ title: club.name, headerShown: false }} />
       <SafeAreaView style={{ flex: 1, backgroundColor: "#F9FAFB" }}>
         <ScrollView style={styles.container}>
-          {/* Back Button */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={22} color="#111827" />
             <Text style={styles.backText}>Back to Discover</Text>
           </TouchableOpacity>
@@ -49,8 +58,9 @@ export default function ClubDetails() {
           <Text style={styles.category}>Category: {club.category}</Text>
 
           <Text style={styles.sectionTitle}>Upcoming Events</Text>
+
           {club.events && club.events.length > 0 ? (
-            club.events.map((event) => (
+            club.events.map((event: any) => (
               <View key={event.id} style={styles.eventCard}>
                 <Text style={styles.eventTitle}>{event.title}</Text>
                 <Text style={styles.eventDate}>📅 {event.date}</Text>
@@ -58,9 +68,7 @@ export default function ClubDetails() {
                   <Text style={styles.eventLocation}>📍 {event.location}</Text>
                 )}
                 {event.description && (
-                  <Text style={styles.eventDescription}>
-                    {event.description}
-                  </Text>
+                  <Text style={styles.eventDescription}>{event.description}</Text>
                 )}
               </View>
             ))
@@ -73,52 +81,17 @@ export default function ClubDetails() {
   );
 }
 
+// Styles
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-    padding: 16,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  notFound: {
-    fontSize: 16,
-    color: "#6B7280",
-  },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-    marginTop: 4, // added space below status bar
-  },
-  backText: {
-    color: "#111827",
-    fontSize: 15,
-    marginLeft: 6,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-  description: {
-    fontSize: 15,
-    color: "#374151",
-    marginBottom: 12,
-  },
-  category: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 10,
-  },
+  container: { flex: 1, backgroundColor: "#F9FAFB", padding: 16 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  notFound: { fontSize: 16, color: "#6B7280" },
+  backButton: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  backText: { color: "#111827", fontSize: 15, marginLeft: 6 },
+  title: { fontSize: 24, fontWeight: "700", marginBottom: 8 },
+  description: { fontSize: 15, color: "#374151", marginBottom: 12 },
+  category: { fontSize: 13, color: "#6B7280", marginBottom: 20 },
+  sectionTitle: { fontSize: 20, fontWeight: "600", marginBottom: 10 },
   eventCard: {
     backgroundColor: "white",
     borderRadius: 12,
@@ -130,24 +103,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  eventDate: {
-    color: "#6B7280",
-    marginTop: 4,
-  },
-  eventLocation: {
-    color: "#6B7280",
-    marginTop: 2,
-  },
-  eventDescription: {
-    color: "#374151",
-    marginTop: 6,
-  },
-  noEvents: {
-    color: "#9CA3AF",
-    marginTop: 4,
-  },
+  eventTitle: { fontSize: 16, fontWeight: "600" },
+  eventDate: { color: "#6B7280", marginTop: 4 },
+  eventLocation: { color: "#6B7280", marginTop: 2 },
+  eventDescription: { color: "#374151", marginTop: 6 },
+  noEvents: { color: "#9CA3AF", marginTop: 4 },
 });
