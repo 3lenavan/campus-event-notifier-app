@@ -3,24 +3,31 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-    addDoc,
-    collection,
-    doc,
-    getDoc,
-    serverTimestamp,
-    setDoc,
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { auth, db } from "../FirebaseConfig";
+import { auth, db } from "../src/lib/firebase";
 import { notifyRSVPConfirmation } from "../src/lib/notifications";
+import { listApprovedEvents } from "../src/services/eventsService";
+import {
+  getEventLikeCount,
+  getEventsInteractions,
+  toggleFavorite as toggleFavoriteService,
+  toggleLike as toggleLikeService
+} from "../src/services/interactionsService";
 
 // Event interface
 interface Event {
@@ -47,18 +54,54 @@ export default function EventDetails() {
   // Event state
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
+  const [liked, setLiked] = useState(false);
+  const [favorited, setFavorited] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+
+  // Track logged-in user
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => setCurrentUser(user));
+    return () => unsubscribe();
+  }, []);
 
   // Fetch event details
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const docRef = doc(db, "events", id as string);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          setEvent({ ...(docSnap.data() as Event), id: docSnap.id });
+        setLoading(true);
+        // Try to get event from local storage first (since eventsService uses local storage)
+        const approvedEvents = await listApprovedEvents();
+        const foundEvent = approvedEvents.find(e => e.id === id);
+        
+        if (foundEvent) {
+          const date = new Date(foundEvent.dateISO);
+          const eventData: Event = {
+            id: foundEvent.id,
+            title: foundEvent.title,
+            description: foundEvent.description,
+            date: date.toISOString().split('T')[0],
+            time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+            location: foundEvent.location,
+            category: "Club Event",
+            attendees: 0,
+            maxAttendees: undefined,
+            imageUrl: undefined,
+            isUserAttending: false,
+            organizer: undefined,
+            fullDescription: foundEvent.description,
+          };
+          setEvent(eventData);
         } else {
-          console.log("No such event!");
+          // Fallback to Firestore if not found in local storage
+          const docRef = doc(db, "events", id as string);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            setEvent({ ...(docSnap.data() as Event), id: docSnap.id });
+          } else {
+            console.log("No such event!");
+          }
         }
       } catch (error) {
         console.error("Error fetching event:", error);
@@ -69,12 +112,67 @@ export default function EventDetails() {
     fetchEvent();
   }, [id]);
 
-  // Track logged-in user
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  // Load like/favorite status when event or user changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => setCurrentUser(user));
-    return () => unsubscribe();
-  }, []);
+    const loadInteractions = async () => {
+      if (!event?.id) return;
+
+      try {
+        if (currentUser?.uid) {
+          const interactions = await getEventsInteractions(currentUser.uid, [event.id]);
+          setLiked(interactions.likedEvents.has(event.id));
+          setFavorited(interactions.favoritedEvents.has(event.id));
+          setLikeCount(interactions.likeCounts[event.id] || 0);
+        } else {
+          // Still get like count even if not logged in
+          const count = await getEventLikeCount(event.id);
+          setLikeCount(count);
+          setLiked(false);
+          setFavorited(false);
+        }
+      } catch (error) {
+        console.error("Error loading interactions:", error);
+      }
+    };
+
+    loadInteractions();
+  }, [event?.id, currentUser?.uid]);
+
+  // Handle like toggle
+  const handleToggleLike = async () => {
+    if (!currentUser) {
+      alert("Please log in to like events.");
+      return;
+    }
+
+    try {
+      const newLikedState = await toggleLikeService(currentUser.uid, event!.id);
+      setLiked(newLikedState);
+      
+      // Reload like count
+      const count = await getEventLikeCount(event!.id);
+      setLikeCount(count);
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      alert("Failed to update like. Please try again.");
+    }
+  };
+
+  // Handle favorite toggle
+  const handleToggleFavorite = async () => {
+    if (!currentUser) {
+      alert("Please log in to favorite events.");
+      return;
+    }
+
+    try {
+      const newFavoritedState = await toggleFavoriteService(currentUser.uid, event!.id);
+      setFavorited(newFavoritedState);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+      alert("Failed to update favorite. Please try again.");
+    }
+  };
 
   // Handle RSVP
   const handleRSVP = async (eventId: string, eventTitle: string) => {
@@ -217,8 +315,16 @@ export default function EventDetails() {
           <TouchableOpacity onPress={() => console.log("Shared")} style={styles.iconButton}>
             <Ionicons name="share-outline" size={20} color="#111" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => console.log("Favorited")} style={styles.iconButton}>
-            <Ionicons name="heart-outline" size={20} color="#111" />
+          <TouchableOpacity 
+            onPress={handleToggleFavorite} 
+            style={styles.iconButton}
+            disabled={!currentUser}
+          >
+            <Ionicons 
+              name={favorited ? "bookmark" : "bookmark-outline"} 
+              size={20} 
+              color={favorited ? "#3B82F6" : "#111"} 
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -299,6 +405,28 @@ export default function EventDetails() {
               <Text style={styles.organizerText}>{event.organizer}</Text>
             </View>
           )}
+        </View>
+
+        {/* Like Section */}
+        <View style={styles.card}>
+          <TouchableOpacity 
+            style={styles.likeSection}
+            onPress={handleToggleLike}
+            disabled={!currentUser}
+          >
+            <Ionicons
+              name={liked ? "heart" : "heart-outline"}
+              size={24}
+              color={liked ? "#EF4444" : "#6B7280"}
+              style={styles.likeIcon}
+            />
+            <View style={styles.likeInfo}>
+              <Text style={styles.likeCount}>{likeCount} {likeCount === 1 ? 'like' : 'likes'}</Text>
+              <Text style={styles.likeSubtext}>
+                {liked ? "You like this event" : currentUser ? "Tap to like" : "Log in to like"}
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* RSVP */}
@@ -434,4 +562,25 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   eventImage: { width: "100%", height: "100%" },
+  likeSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  likeIcon: {
+    marginRight: 12,
+  },
+  likeInfo: {
+    flex: 1,
+  },
+  likeCount: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  likeSubtext: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginTop: 2,
+  },
 });

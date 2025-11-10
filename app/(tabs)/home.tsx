@@ -5,6 +5,7 @@ import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
 import { getLS, LS_KEYS } from "../../src/lib/localStorage";
 import { listApprovedEvents } from "../../src/services/eventsService";
+import { getEventsInteractions, toggleFavorite as toggleFavoriteService, toggleLike as toggleLikeService } from "../../src/services/interactionsService";
 import EventCard, { Event as BaseEvent } from "../event-card";
 
 type FeedEvent = BaseEvent & {
@@ -37,6 +38,8 @@ export default function HomeScreen() {
     try {
       const approved = await listApprovedEvents();
       const clubs = (await getLS<any[]>(LS_KEYS.CLUBS, [])) || [];
+      
+      // Map events to FeedEvent format
       const eventsMapped: FeedEvent[] = approved.map((event) => {
         const date = new Date(event.dateISO);
         return {
@@ -57,11 +60,25 @@ export default function HomeScreen() {
           club: { id: event.clubId, name: clubs.find((c:any)=>c.id===event.clubId)?.name || "Unknown Club" },
         };
       }).sort((a,b)=> new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      // Load likes and favorites if user is logged in
+      if (user?.uid) {
+        const eventIds = eventsMapped.map(e => e.id);
+        const interactions = await getEventsInteractions(user.uid, eventIds);
+        
+        // Update events with interaction data
+        eventsMapped.forEach(event => {
+          event.liked = interactions.likedEvents.has(event.id);
+          event.favorited = interactions.favoritedEvents.has(event.id);
+          event.likes = interactions.likeCounts[event.id] || 0;
+        });
+      }
+
       setEvents(eventsMapped);
     } catch (e) {
       console.error("Error loading approved events:", e);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => { loadApproved(); }, [loadApproved]);
   useFocusEffect(useCallback(() => { loadApproved(); }, [loadApproved]));
@@ -70,19 +87,95 @@ export default function HomeScreen() {
     router.push({ pathname: "/event-details-screen", params: { id: event.id } });
   }, []);
 
-  const toggleLike = useCallback((eventId: string) => {
-    setEvents((prev) =>
-      prev.map((e) =>
-        e.id === eventId
-          ? { ...e, liked: !e.liked, likes: e.likes + (e.liked ? -1 : 1) }
-          : e
-      )
-    );
-  }, []);
+  const toggleLike = useCallback(async (eventId: string) => {
+    if (!user?.uid) {
+      alert("Please log in to like events.");
+      return;
+    }
 
-  const toggleFavorite = useCallback((eventId: string) => {
-    setEvents((prev) => prev.map((e) => (e.id === eventId ? { ...e, favorited: !e.favorited } : e)));
-  }, []);
+    try {
+      // Optimistically update UI
+      setEvents((prev) =>
+        prev.map((e) => {
+          if (e.id === eventId) {
+            const newLiked = !e.liked;
+            return {
+              ...e,
+              liked: newLiked,
+              likes: e.likes + (newLiked ? 1 : -1),
+            };
+          }
+          return e;
+        })
+      );
+
+      // Update in Firestore
+      const newLikedState = await toggleLikeService(user.uid, eventId);
+      
+      // Reload to get accurate like count
+      const interactions = await getEventsInteractions(user.uid, [eventId]);
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId
+            ? {
+                ...e,
+                liked: interactions.likedEvents.has(eventId),
+                likes: interactions.likeCounts[eventId] || 0,
+              }
+            : e
+        )
+      );
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      // Revert optimistic update on error
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId
+            ? { ...e, liked: !e.liked, likes: e.likes + (e.liked ? 1 : -1) }
+            : e
+        )
+      );
+      alert("Failed to update like. Please try again.");
+    }
+  }, [user]);
+
+  const toggleFavorite = useCallback(async (eventId: string) => {
+    if (!user?.uid) {
+      alert("Please log in to favorite events.");
+      return;
+    }
+
+    try {
+      // Optimistically update UI
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId ? { ...e, favorited: !e.favorited } : e
+        )
+      );
+
+      // Update in Firestore
+      await toggleFavoriteService(user.uid, eventId);
+      
+      // Reload to ensure consistency
+      const interactions = await getEventsInteractions(user.uid, [eventId]);
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId
+            ? { ...e, favorited: interactions.favoritedEvents.has(eventId) }
+            : e
+        )
+      );
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+      // Revert optimistic update on error
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId ? { ...e, favorited: !e.favorited } : e
+        )
+      );
+      alert("Failed to update favorite. Please try again.");
+    }
+  }, [user]);
 
   const toggleRSVP = useCallback((eventId: string) => {
     setEvents((prev) =>

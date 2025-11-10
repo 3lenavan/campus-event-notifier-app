@@ -53,6 +53,22 @@ export const listClubEvents = async (clubId: string): Promise<Event[]> => {
 };
 
 /**
+ * Get events by their IDs
+ */
+export const getEventsByIds = async (eventIds: string[]): Promise<Event[]> => {
+  try {
+    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
+    return events
+      .filter(event => eventIds.includes(event.id))
+      .filter(event => event.status === "approved") // Only return approved events
+      .sort((a, b) => new Date(a.dateISO).getTime() - new Date(b.dateISO).getTime()); // Sort by date
+  } catch (error) {
+    console.error('Error getting events by IDs:', error);
+    throw error;
+  }
+};
+
+/**
  * Create a new event
  */
 export const createEvent = async (eventInput: CreateEventInput, createdBy: string): Promise<Event> => {

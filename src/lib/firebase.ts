@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -17,12 +18,16 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase Auth
 const auth = getAuth(app);
 
+// Initialize Firestore
+const db = getFirestore(app);
+
 // Debug logging
 console.log("🔥 Firebase initialized with config:", {
   projectId: firebaseConfig.projectId,
   authDomain: firebaseConfig.authDomain,
 });
 console.log("🔥 Auth instance created:", !!auth);
+console.log("🔥 Firestore instance created:", !!db);
 
 // Connect to emulator in development if needed
 if (__DEV__ && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
@@ -34,5 +39,5 @@ if (__DEV__ && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
   }
 }
 
-export { auth };
+export { auth, db };
 export default app;

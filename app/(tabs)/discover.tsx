@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -13,6 +13,7 @@ import { useAuthUser } from "../../src/hooks/useAuthUser";
 import { getEventPolicy, isCreationEnabledForClub } from "../../src/lib/eventPolicy";
 import { getLS, LS_KEYS } from "../../src/lib/localStorage";
 import { listApprovedEvents } from "../../src/services/eventsService";
+import { getEventsInteractions, toggleLike as toggleLikeService, toggleFavorite as toggleFavoriteService } from "../../src/services/interactionsService";
 import { Club } from "../../src/types";
 import { ClubModerationPanel } from "../../src/components";
 import EventCard from "../event-card";
@@ -46,6 +47,17 @@ export default function Discover() {
   const [events, setEvents] = useState<LegacyEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   
+  // Event interactions state (likes/favorites)
+  const [eventInteractions, setEventInteractions] = useState<{
+    likedEvents: Set<string>;
+    favoritedEvents: Set<string>;
+    likeCounts: Record<string, number>;
+  }>({
+    likedEvents: new Set(),
+    favoritedEvents: new Set(),
+    likeCounts: {},
+  });
+  
   // Event policy state
   const [eventPolicy, setEventPolicy] = useState<any>(null);
   const [canCreateEvents, setCanCreateEvents] = useState<Record<string, boolean>>({});
@@ -76,6 +88,13 @@ export default function Discover() {
           clubName: 'Unknown Club', // Will be resolved below
         }));
         setEvents(legacyEvents);
+
+        // Load likes and favorites if user is logged in
+        if (user?.uid && legacyEvents.length > 0) {
+          const eventIds = legacyEvents.map(e => e.id);
+          const interactions = await getEventsInteractions(user.uid, eventIds);
+          setEventInteractions(interactions);
+        }
       } catch (error) {
         console.error("Error fetching events:", error);
       } finally {
@@ -84,7 +103,7 @@ export default function Discover() {
     };
 
     fetchEvents();
-  }, []);
+  }, [user]);
 
   // Load clubs from Local Storage
   const [clubs, setClubs] = useState<Club[]>([]);
@@ -157,6 +176,42 @@ export default function Discover() {
       .sort(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
       );
+
+  // Handle like toggle
+  const handleToggleLike = useCallback(async (eventId: string) => {
+    if (!user?.uid) {
+      return;
+    }
+
+    try {
+      await toggleLikeService(user.uid, eventId);
+      
+      // Reload interactions
+      const eventIds = events.map(e => e.id);
+      const interactions = await getEventsInteractions(user.uid, eventIds);
+      setEventInteractions(interactions);
+    } catch (error) {
+      console.error("Error toggling like:", error);
+    }
+  }, [user, events]);
+
+  // Handle favorite toggle
+  const handleToggleFavorite = useCallback(async (eventId: string) => {
+    if (!user?.uid) {
+      return;
+    }
+
+    try {
+      await toggleFavoriteService(user.uid, eventId);
+      
+      // Reload interactions
+      const eventIds = events.map(e => e.id);
+      const interactions = await getEventsInteractions(user.uid, eventIds);
+      setEventInteractions(interactions);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
+  }, [user, events]);
 
   // Check if user can create events for a club
   const canCreateEvent = async (clubId: string) => {
@@ -381,6 +436,11 @@ export default function Discover() {
                             params: { id: event.id },
                           })
                         }
+                        onLike={user ? handleToggleLike : undefined}
+                        onFavorite={user ? handleToggleFavorite : undefined}
+                        liked={eventInteractions.likedEvents.has(event.id)}
+                        favorited={eventInteractions.favoritedEvents.has(event.id)}
+                        likesCount={eventInteractions.likeCounts[event.id] || 0}
                       />
                     ))}
 

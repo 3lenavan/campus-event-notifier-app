@@ -1,16 +1,38 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useState, useCallback } from "react";
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
 import { auth } from "../../src/lib/firebase";
 import { getLS, LS_KEYS } from "../../src/lib/localStorage";
-import { Club } from "../../src/types";
+import { Club, Event } from "../../src/types";
+import { getUserLikedEvents, getUserFavoritedEvents } from "../../src/services/interactionsService";
+import { getEventsByIds } from "../../src/services/eventsService";
+import EventCard from "../event-card";
+import { useFocusEffect } from "expo-router";
+
+type ProfileEvent = {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  time: string;
+  location: string;
+  category: string;
+  attendees: number;
+  maxAttendees?: number;
+  imageUrl?: string;
+  isUserAttending?: boolean;
+};
 
 const Profile = () => {
   const { user, profile, loading } = useAuthUser();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [likedEvents, setLikedEvents] = useState<ProfileEvent[]>([]);
+  const [favoritedEvents, setFavoritedEvents] = useState<ProfileEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [activeTab, setActiveTab] = useState<'liked' | 'favorited'>('liked');
 
   useEffect(() => {
     const loadClubs = async () => {
@@ -25,6 +47,68 @@ const Profile = () => {
     loadClubs();
   }, []);
 
+  const loadUserEvents = useCallback(async () => {
+    if (!user?.uid) {
+      setLoadingEvents(false);
+      return;
+    }
+
+    try {
+      setLoadingEvents(true);
+      
+      // Fetch liked and favorited event IDs
+      const [likedEventIds, favoritedEventIds] = await Promise.all([
+        getUserLikedEvents(user.uid),
+        getUserFavoritedEvents(user.uid),
+      ]);
+
+      // Fetch actual event data
+      const [likedEventsData, favoritedEventsData] = await Promise.all([
+        getEventsByIds(likedEventIds),
+        getEventsByIds(favoritedEventIds),
+      ]);
+
+      // Convert to ProfileEvent format
+      const clubsData = await getLS<Club[]>(LS_KEYS.CLUBS, []);
+      
+      const convertToProfileEvent = (event: Event): ProfileEvent => {
+        const date = new Date(event.dateISO);
+        return {
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          date: date.toISOString(),
+          time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+          location: event.location,
+          category: "Club Event",
+          attendees: 0,
+          maxAttendees: undefined,
+          imageUrl: undefined,
+          isUserAttending: false,
+        };
+      };
+
+      setLikedEvents(likedEventsData.map(convertToProfileEvent));
+      setFavoritedEvents(favoritedEventsData.map(convertToProfileEvent));
+    } catch (error) {
+      console.error('Error loading user events:', error);
+    } finally {
+      setLoadingEvents(false);
+    }
+  }, [user?.uid]);
+
+  // Load events when component mounts and when user changes
+  useEffect(() => {
+    loadUserEvents();
+  }, [loadUserEvents]);
+
+  // Reload events when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadUserEvents();
+    }, [loadUserEvents])
+  );
+
   const handleSignOut = async () => {
     try {
       await auth.signOut();
@@ -36,7 +120,7 @@ const Profile = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Header */}
       <View style={styles.headerSection}>
         <Text style={styles.header}>Profile</Text>
@@ -67,6 +151,93 @@ const Profile = () => {
           )}
         </View>
       </View>
+
+      {/* My Events Section */}
+      {user && (
+        <View style={styles.eventsSection}>
+          <Text style={styles.sectionTitle}>My Events</Text>
+          
+          {/* Tab Selector */}
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'liked' && styles.activeTab]}
+              onPress={() => setActiveTab('liked')}
+            >
+              <Ionicons 
+                name={activeTab === 'liked' ? "heart" : "heart-outline"} 
+                size={18} 
+                color={activeTab === 'liked' ? "#EF4444" : "#6B7280"} 
+              />
+              <Text style={[styles.tabText, activeTab === 'liked' && styles.activeTabText]}>
+                Liked ({likedEvents.length})
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'favorited' && styles.activeTab]}
+              onPress={() => setActiveTab('favorited')}
+            >
+              <Ionicons 
+                name={activeTab === 'favorited' ? "bookmark" : "bookmark-outline"} 
+                size={18} 
+                color={activeTab === 'favorited' ? "#3B82F6" : "#6B7280"} 
+              />
+              <Text style={[styles.tabText, activeTab === 'favorited' && styles.activeTabText]}>
+                Favorited ({favoritedEvents.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Events List */}
+          {loadingEvents ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>Loading events...</Text>
+            </View>
+          ) : (
+            <>
+              {activeTab === 'liked' ? (
+                likedEvents.length > 0 ? (
+                  <View style={styles.eventsList}>
+                    {likedEvents.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        onPress={() => router.push({ pathname: "/event-details-screen", params: { id: event.id } })}
+                        compact={true}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="heart-outline" size={48} color="#9CA3AF" />
+                    <Text style={styles.emptyText}>No liked events yet</Text>
+                    <Text style={styles.emptySubtext}>Start liking events to see them here</Text>
+                  </View>
+                )
+              ) : (
+                favoritedEvents.length > 0 ? (
+                  <View style={styles.eventsList}>
+                    {favoritedEvents.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        onPress={() => router.push({ pathname: "/event-details-screen", params: { id: event.id } })}
+                        compact={true}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="bookmark-outline" size={48} color="#9CA3AF" />
+                    <Text style={styles.emptyText}>No favorited events yet</Text>
+                    <Text style={styles.emptySubtext}>Start favoriting events to see them here</Text>
+                  </View>
+                )
+              )}
+            </>
+          )}
+        </View>
+      )}
 
       {/* Settings Section */}
       <View style={styles.settingsBox}>
@@ -126,12 +297,13 @@ const Profile = () => {
         <Ionicons name="log-out-outline" size={20} color="white" />
         <Text style={styles.buttonText}>Sign Out</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#fff" },
+  contentContainer: { padding: 20, paddingBottom: 40 },
   headerSection: { marginBottom: 20 },
   header: { fontSize: 22, fontWeight: "700" },
   subheader: { fontSize: 14, color: "#666" },
@@ -162,6 +334,66 @@ const styles = StyleSheet.create({
   info: { flexDirection: "column" },
   name: { fontSize: 18, fontWeight: "600" },
   email: { fontSize: 14, color: "#6b7280" },
+  eventsSection: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    marginBottom: 20,
+    padding: 16,
+  },
+  tabContainer: {
+    flexDirection: "row",
+    marginBottom: 16,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 8,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    gap: 6,
+  },
+  activeTab: {
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#6B7280",
+  },
+  activeTabText: {
+    color: "#111827",
+    fontWeight: "600",
+  },
+  eventsList: {
+    gap: 12,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#6B7280",
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: "#9CA3AF",
+    marginTop: 4,
+  },
   settingsBox: {
     borderRadius: 12,
     backgroundColor: "#fff",
@@ -177,13 +409,13 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 16, fontWeight: "500" },
   rowSubtitle: { fontSize: 13, color: "#6b7280", marginTop: 2 },
   button: {
-    marginTop: "auto",
     backgroundColor: "#ef4444",
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
+    marginBottom: 20,
   },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600", marginLeft: 8 },
   roleContainer: {

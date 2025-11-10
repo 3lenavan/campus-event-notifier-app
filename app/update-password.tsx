@@ -1,21 +1,21 @@
-import React, { useState } from "react";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from "react-native";
+import { auth } from "@/src/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { auth } from "@/FirebaseConfig";
 import {
-  reauthenticateWithCredential,
-  updatePassword,
-  EmailAuthProvider,
+    EmailAuthProvider,
+    reauthenticateWithCredential,
+    updatePassword,
 } from "firebase/auth";
+import { useState } from "react";
+import {
+    Alert,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
 
 export default function UpdatePassword() {
   const user = auth.currentUser;
