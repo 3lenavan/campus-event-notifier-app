@@ -28,6 +28,8 @@ import {
   toggleFavorite as toggleFavoriteService,
   toggleLike as toggleLikeService
 } from "../src/services/interactionsService";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 
 // Event interface
 interface Event {
@@ -204,7 +206,7 @@ export default function EventDetails() {
   };
 
   // Handle Add to Calendar
-  const handleAddToCalendar = (event: Event) => {
+  const handleAddToCalendar = async (event: Event) => {
     try {
       // Create event date/time
       const eventDateTime = new Date(`${event.date}T${event.time}`);
@@ -224,28 +226,35 @@ export default function EventDetails() {
         `UID:${uid}`,
         `DTSTART:${startTime}`,
         `DTEND:${endTime}`,
-        `SUMMARY:${event.title}`,
-        `DESCRIPTION:${event.description}\\n\\nLocation: ${event.location}`,
-        `LOCATION:${event.location}`,
+        `SUMMARY:${event.title.replace(/,/g, '\\,')}`,
+        `DESCRIPTION:${event.description.replace(/,/g, '\\,').replace(/\n/g, '\\n')}\\n\\nLocation: ${event.location.replace(/,/g, '\\,')}`,
+        `LOCATION:${event.location.replace(/,/g, '\\,')}`,
         `STATUS:CONFIRMED`,
         `TRANSP:OPAQUE`,
         'END:VEVENT',
         'END:VCALENDAR'
       ].join('\r\n');
 
-      // Create and download the file
-      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      alert('Calendar file downloaded successfully!');
+      // Create file name
+      const fileName = `${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      // Write file to device
+      await FileSystem.writeAsStringAsync(fileUri, icsContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      // Check if sharing is available
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        // Share the file
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/calendar',
+          dialogTitle: 'Add to Calendar',
+        });
+      } else {
+        alert('Sharing is not available on this device.');
+      }
     } catch (error) {
       console.error('Error creating calendar file:', error);
       alert('Failed to create calendar file. Please try again.');

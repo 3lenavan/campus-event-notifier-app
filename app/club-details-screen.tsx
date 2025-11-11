@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { auth, db } from "../FirebaseConfig";
+import { auth, db } from "../src/lib/firebase";
 import {
   doc,
   getDoc,
