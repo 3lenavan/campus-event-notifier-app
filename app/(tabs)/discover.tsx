@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { collection, getDocs } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Image,
   ScrollView,
@@ -11,77 +10,43 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { db } from "../../src/lib/firebase";
-import { listApprovedEvents } from "../../src/services/eventsService";
-
-// Firestore Interfaces
-interface Club {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  imageUrl?: string;
-}
-
-interface Event {
-  id: string;
-  title: string;
-  clubId: string;
-  date: string;
-}
+import { getClubs, Club } from "../../data/dataLoader";
 
 export default function Discover() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [clubs, setClubs] = useState<Club[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch clubs from Firestore and events from local storage
+  // ✅ Load club data from Supabase when screen mounts
   useEffect(() => {
-    const fetchData = async () => {
+    async function loadClubs() {
       try {
-        // Fetch clubs from Firestore
-        const clubSnap = await getDocs(collection(db, "clubs"));
-        const clubData = clubSnap.docs.map((doc) => {
-          const data = doc.data() as Club;
-          const { id: _, ...rest } = data; // remove Firestore field id if exists
-          return { id: doc.id, ...rest };
-        });
-        setClubs(clubData);
-
-        // Fetch events from local storage (using eventsService)
-        const approvedEvents = await listApprovedEvents();
-        // Convert to simple Event format for counting
-        const eventData: Event[] = approvedEvents.map((event) => ({
-          id: event.id,
-          title: event.title,
-          clubId: event.clubId,
-          date: event.dateISO,
-        }));
-        setEvents(eventData);
+        const data = await getClubs(); // fetch from Supabase
+        setClubs(data || []);
       } catch (error) {
-        console.error("Error loading clubs/events:", error);
+        console.error("Error loading clubs:", error);
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchData();
+    }
+    loadClubs();
   }, []);
 
-  // ✅ Filter by search input
-  const filteredClubs = clubs.filter(
-    (club) =>
-      club.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      club.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      club.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // ✅ Filter clubs by search text
+  const filteredClubs = clubs.filter((club) => {
+    const name = club.name?.toLowerCase() ?? "";
+    const category = club.category?.toLowerCase() ?? "";
+    const description = club.description?.toLowerCase() ?? "";
+    return (
+      name.includes(searchQuery.toLowerCase()) ||
+      category.includes(searchQuery.toLowerCase()) ||
+      description.includes(searchQuery.toLowerCase())
+    );
+  });
 
-  const getEventCount = (clubId: string) =>
-    events.filter((event) => event.clubId === clubId).length;
+  const getEventCount = (club: Club) => club.events?.length || 0;
 
-  // Category color mapping
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
       Academic: "#3B82F6",
@@ -112,7 +77,7 @@ export default function Discover() {
         </View>
       </View>
 
-      {/* ✅ Search Bar */}
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons
           name="search-outline"
@@ -129,7 +94,7 @@ export default function Discover() {
         />
       </View>
 
-      {/* ✅ Club List */}
+      {/* Club List */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {filteredClubs.length === 0 ? (
           <View style={styles.emptyState}>
@@ -144,52 +109,42 @@ export default function Discover() {
               style={styles.clubCard}
               onPress={() =>
                 router.push({
-                  pathname: "/club-details-screen",
+                  pathname: "/clubs/[id]" as any,
                   params: { id: club.id },
                 })
               }
             >
-              {/* Club Image or Placeholder */}
-              {club.imageUrl ? (
-                <Image
-                  source={{ uri: club.imageUrl }}
-                  style={styles.clubImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.clubImagePlaceholder,
-                    { backgroundColor: getCategoryColor(club.category) },
-                  ]}
-                >
-                  <Text style={styles.clubIconText}>
-                    {club.name[0].toUpperCase()}
-                  </Text>
-                </View>
-              )}
+              <Image
+                source={{
+                  uri:
+                    club.imageUrl && club.imageUrl.startsWith("http")
+                      ? club.imageUrl
+                      : "https://via.placeholder.com/300x150.png?text=Club+Image",
+                }}
+                style={styles.clubImage}
+                resizeMode="cover"
+              />
 
-              {/* Club Info */}
               <View style={styles.clubInfo}>
                 <Text style={styles.clubName}>{club.name}</Text>
                 <Text style={styles.clubDescription}>
-                  {club.description.length > 80
+                  {club.description && club.description.length > 80
                     ? club.description.substring(0, 80) + "..."
-                    : club.description}
+                    : club.description || "No description available"}
                 </Text>
 
                 <View style={styles.badgeRow}>
                   <View
                     style={[
                       styles.categoryBadge,
-                      { backgroundColor: getCategoryColor(club.category) },
+                      { backgroundColor: getCategoryColor(club.category || "Other") },
                     ]}
                   >
                     <Text style={styles.categoryText}>{club.category}</Text>
                   </View>
                   <Text style={styles.eventCount}>
-                    {getEventCount(club.id)} upcoming event
-                    {getEventCount(club.id) !== 1 ? "s" : ""}
+                    {getEventCount(club)} upcoming event
+                    {getEventCount(club) !== 1 ? "s" : ""}
                   </Text>
                 </View>
               </View>
@@ -201,7 +156,7 @@ export default function Discover() {
   );
 }
 
-// ✅ Styles
+// Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -216,8 +171,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 22, fontWeight: "bold", color: "#111827" },
   headerSubtitle: { fontSize: 13, color: "#6B7280" },
-
-  // ✅ Better Search Bar
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -242,13 +195,10 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
   },
   searchIcon: { marginRight: 4 },
-
   scrollContent: { padding: 16, paddingBottom: 120 },
   emptyState: { alignItems: "center", marginTop: 60 },
   emptyText: { color: "#6B7280", fontSize: 15 },
   emptySubText: { fontSize: 12, color: "#9CA3AF", marginTop: 4 },
-
-  // ✅ Card Styling
   clubCard: {
     backgroundColor: "white",
     borderRadius: 16,
@@ -260,11 +210,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   clubImage: { width: "100%", height: 140 },
-  clubImagePlaceholder: {
-    height: 140,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   clubInfo: { padding: 12 },
   clubName: { fontWeight: "700", fontSize: 17, color: "#111827" },
   clubDescription: {
@@ -281,5 +226,4 @@ const styles = StyleSheet.create({
   },
   categoryText: { color: "white", fontSize: 11, fontWeight: "600" },
   eventCount: { fontSize: 12, color: "#6B7280", marginLeft: 8 },
-  clubIconText: { color: "white", fontSize: 32, fontWeight: "bold" },
 });
