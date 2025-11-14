@@ -45,7 +45,8 @@ export default function Discover() {
     );
   });
 
-  const getEventCount = (club: Club) => club.events?.length || 0;
+  const getEventCount = (club: Club) => Array.isArray(club.events) ? club.events.length : 0;
+
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {

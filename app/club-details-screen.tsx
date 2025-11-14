@@ -1,231 +1,125 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-  TextInput,   // added this
-} from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams, Stack, useRouter } from "expo-router";
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getClubByIdSupabase, Club } from "../data/dataLoader";  //  Added Club
+import { getClubByIdSupabase, getEventsByClub, Club } from "../data/dataLoader";
 
-
-
-export default function Discover() {
+export default function ClubDetails() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [clubs, setClubs] = useState<Club[]>([]);
+  const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Load club data from Supabase when screen mounts
-  useEffect(() => {
-    async function loadClubs() {
-      try {
-        const data = await getClubs(); // fetch from Supabase
-        setClubs(data || []);
-      } catch (error) {
-        console.error("Error loading clubs:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadClubs();
-  }, []);
-
-  // ✅ Filter clubs by search text
-  const filteredClubs = clubs.filter((club) => {
-    const name = club.name?.toLowerCase() ?? "";
-    const category = club.category?.toLowerCase() ?? "";
-    const description = club.description?.toLowerCase() ?? "";
-    return (
-      name.includes(searchQuery.toLowerCase()) ||
-      category.includes(searchQuery.toLowerCase()) ||
-      description.includes(searchQuery.toLowerCase())
-    );
-  });
-
-  const getEventCount = (club: Club) => club.events?.length || 0;
-
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      Academic: "#3B82F6",
-      Social: "#8B5CF6",
-      Sports: "#22C55E",
-      Arts: "#EC4899",
-      Career: "#F97316",
-      Other: "#6B7280",
-    };
-    return colors[category] || colors["Other"];
+  const handleRSVP = (eventId: number) => {
+    console.log("RSVP tapped for event:", eventId);
   };
+
+  useEffect(() => {
+    const load = async () => {
+      if (!id) return;
+      const numericId = Number(id);
+      const c = await getClubByIdSupabase(numericId);
+      const e = await getEventsByClub(numericId);
+      if (c) c.events = e;
+      setClub(c);
+      setLoading(false);
+    };
+    load();
+  }, [id]);
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: "#6B7280" }}>Loading clubs...</Text>
+        <Text style={styles.notFound}>Loading club...</Text>
+      </View>
+    );
+  }
+
+  if (!club) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.notFound}>Club not found.</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Discover</Text>
-          <Text style={styles.headerSubtitle}>Find clubs and organizations</Text>
-        </View>
-      </View>
+    <>
+      <Stack.Screen options={{ title: club.name, headerShown: false }} />
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons
-          name="search-outline"
-          size={18}
-          color="#6B7280"
-          style={styles.searchIcon}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Search clubs..."
-          placeholderTextColor="#9CA3AF"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F9FAFB" }}>
+        <ScrollView style={styles.container}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={22} color="#111827" />
+            <Text style={styles.backText}>Back to Discover</Text>
+          </TouchableOpacity>
 
-      {/* Club List */}
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {filteredClubs.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No clubs found</Text>
-            <Text style={styles.emptySubText}>Try a different search term</Text>
-          </View>
-        ) : (
-          filteredClubs.map((club) => (
-            <TouchableOpacity
-              key={club.id}
-              activeOpacity={0.85}
-              style={styles.clubCard}
-              onPress={() =>
-                router.push({
-                  pathname: "/clubs/[id]" as any,
-                  params: { id: club.id },
-                })
-              }
-            >
-              <Image
-                source={{
-                  uri:
-                    club.imageUrl && club.imageUrl.startsWith("http")
-                      ? club.imageUrl
-                      : "https://via.placeholder.com/300x150.png?text=Club+Image",
-                }}
-                style={styles.clubImage}
-                resizeMode="cover"
-              />
+          <Text style={styles.title}>{club.name}</Text>
+          <Text style={styles.description}>{club.description}</Text>
+          <Text style={styles.category}>Category: {club.category}</Text>
 
-              <View style={styles.clubInfo}>
-                <Text style={styles.clubName}>{club.name}</Text>
-                <Text style={styles.clubDescription}>
-                  {club.description && club.description.length > 80
-                    ? club.description.substring(0, 80) + "..."
-                    : club.description || "No description available"}
-                </Text>
+          <Text style={styles.sectionTitle}>Upcoming Events</Text>
 
-                <View style={styles.badgeRow}>
-                  <View
-                    style={[
-                      styles.categoryBadge,
-                      { backgroundColor: getCategoryColor(club.category || "Other") },
-                    ]}
-                  >
-                    <Text style={styles.categoryText}>{club.category}</Text>
-                  </View>
-                  <Text style={styles.eventCount}>
-                    {getEventCount(club)} upcoming event
-                    {getEventCount(club) !== 1 ? "s" : ""}
-                  </Text>
-                </View>
+          {club.events && club.events.length > 0 ? (
+            club.events.map((event: any) => (
+              <View key={event.id} style={styles.eventCard}>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                <Text style={styles.eventDate}>Date: {event.date}</Text>
+                <Text style={styles.eventLocation}>Location: {event.location}</Text>
+                <Text style={styles.eventDescription}>{event.description}</Text>
+
+                <TouchableOpacity
+                  style={styles.rsvpButton}
+                  onPress={() => handleRSVP(event.id)}
+                >
+                  <Text style={styles.rsvpText}>RSVP</Text>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
-    </View>
+            ))
+          ) : (
+            <Text style={styles.noEvents}>No upcoming events.</Text>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </>
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB" },
+  container: { flex: 1, backgroundColor: "#F9FAFB", padding: 16 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: {
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  notFound: { fontSize: 16, color: "#6B7280" },
+  backButton: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  backText: { color: "#111827", fontSize: 15, marginLeft: 6 },
+  title: { fontSize: 24, fontWeight: "700", marginBottom: 8 },
+  description: { fontSize: 15, color: "#374151", marginBottom: 12 },
+  category: { fontSize: 13, color: "#6B7280", marginBottom: 20 },
+  sectionTitle: { fontSize: 20, fontWeight: "600", marginBottom: 10 },
+  eventCard: {
     backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB"
   },
-  headerTitle: { fontSize: 22, fontWeight: "bold", color: "#111827" },
-  headerSubtitle: { fontSize: 13, color: "#6B7280" },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 8,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: "#D1D5DB",
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-    paddingHorizontal: 10,
-  },
-  input: {
-    flex: 1,
-    height: 40,
-    fontSize: 14,
-    color: "#111827",
-    paddingLeft: 8,
-  },
-  searchIcon: { marginRight: 4 },
-  scrollContent: { padding: 16, paddingBottom: 120 },
-  emptyState: { alignItems: "center", marginTop: 60 },
-  emptyText: { color: "#6B7280", fontSize: 15 },
-  emptySubText: { fontSize: 12, color: "#9CA3AF", marginTop: 4 },
-  clubCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    marginBottom: 20,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  clubImage: { width: "100%", height: 140 },
-  clubInfo: { padding: 12 },
-  clubName: { fontWeight: "700", fontSize: 17, color: "#111827" },
-  clubDescription: {
-    color: "#4B5563",
-    fontSize: 13,
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  badgeRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  categoryBadge: {
+  eventTitle: { fontSize: 16, fontWeight: "600" },
+  eventDate: { color: "#6B7280", marginTop: 4 },
+  eventLocation: { color: "#6B7280", marginTop: 2 },
+  eventDescription: { color: "#374151", marginTop: 6 },
+  noEvents: { color: "#9CA3AF", marginTop: 4 },
+
+  rsvpButton: {
+    marginTop: 12,
+    backgroundColor: "#3B82F6",
+    paddingVertical: 10,
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    alignItems: "center"
   },
-  categoryText: { color: "white", fontSize: 11, fontWeight: "600" },
-  eventCount: { fontSize: 12, color: "#6B7280", marginLeft: 8 },
+  rsvpText: {
+    color: "white",
+    fontWeight: "600",
+    fontSize: 15
+  }
 });
