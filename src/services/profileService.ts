@@ -1,19 +1,41 @@
 import { User } from 'firebase/auth';
+import { supabase } from '../../data/supabaseClient';
 import { ADMIN_EMAILS } from '../lib/constants';
 import { sha256 } from '../lib/hash';
-import { getLS, LS_KEYS, setLS } from '../lib/localStorage';
 import { Club, UserProfile } from '../types';
 
 /**
- * Get user profile from Local Storage
+ * Get user profile from Supabase
  */
 export const getProfile = async (uid: string): Promise<UserProfile | null> => {
   try {
-    const userProfiles = await getLS<Record<string, UserProfile>>(LS_KEYS.USER_PROFILES, {});
-    return userProfiles[uid] || null;
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('uid', uid)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error getting user profile from Supabase:', error);
+      return null;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    // Transform Supabase data to UserProfile interface
+    return {
+      uid: data.uid,
+      name: data.name,
+      email: data.email,
+      role: data.role || 'student',
+      memberships: data.memberships || [],
+      isAdmin: data.is_admin || false,
+    };
   } catch (error) {
     console.error('Error getting user profile:', error);
-    throw error;
+    return null;
   }
 };
 
@@ -22,33 +44,50 @@ export const getProfile = async (uid: string): Promise<UserProfile | null> => {
  */
 export const upsertProfileFromAuth = async (user: User): Promise<UserProfile> => {
   try {
-    const userProfiles = await getLS<Record<string, UserProfile>>(LS_KEYS.USER_PROFILES, {});
-    
-    let profile = userProfiles[user.uid];
     const emailNormalized = (user.email || '').trim().toLowerCase();
     
-    if (!profile) {
-      // Create new profile for first-time user
-      profile = {
-        uid: user.uid,
-        name: user.displayName || user.email?.split('@')[0] || 'Unknown User',
-        email: emailNormalized,
-        role: 'student',
-        memberships: [],
-        isAdmin: ADMIN_EMAILS.includes(emailNormalized),
-      };
-    } else {
-      // Update existing profile with latest auth data
-      profile.name = user.displayName || profile.name;
-      profile.email = emailNormalized || profile.email;
-      profile.isAdmin = ADMIN_EMAILS.includes(emailNormalized);
+    // Check if profile exists
+    const existing = await getProfile(user.uid);
+    
+    const profileData = {
+      uid: user.uid,
+      name: user.displayName || user.email?.split('@')[0] || 'Unknown User',
+      email: emailNormalized,
+      role: existing?.role || 'student',
+      memberships: existing?.memberships || [],
+      is_admin: (ADMIN_EMAILS as readonly string[]).includes(emailNormalized),
+    };
+
+    // Upsert to Supabase
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .upsert({
+        uid: profileData.uid,
+        name: profileData.name,
+        email: profileData.email,
+        role: profileData.role,
+        memberships: profileData.memberships,
+        is_admin: profileData.is_admin,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'uid',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error upserting user profile to Supabase:', error);
+      throw error;
     }
-    
-    // Save back to Local Storage
-    userProfiles[user.uid] = profile;
-    await setLS(LS_KEYS.USER_PROFILES, userProfiles);
-    
-    return profile;
+
+    return {
+      uid: data.uid,
+      name: data.name,
+      email: data.email,
+      role: data.role || 'student',
+      memberships: data.memberships || [],
+      isAdmin: data.is_admin || false,
+    };
   } catch (error) {
     console.error('Error upserting user profile:', error);
     throw error;
@@ -64,11 +103,9 @@ export const verifyClubMembership = async (
   codePlaintext: string
 ): Promise<{ success: boolean; message: string; club?: Club }> => {
   try {
-    // Get clubs and user profile
-    const [clubs, userProfiles] = await Promise.all([
-      getLS<Club[]>(LS_KEYS.CLUBS, []),
-      getLS<Record<string, UserProfile>>(LS_KEYS.USER_PROFILES, {}),
-    ]);
+    // Get clubs from Supabase
+    const { listClubs } = await import('./clubsService');
+    const clubs = await listClubs();
 
     if (!clubs || clubs.length === 0) {
       return { success: false, message: 'No clubs found. Please contact support.' };
@@ -90,25 +127,34 @@ export const verifyClubMembership = async (
       return { success: false, message: 'Invalid verification code.' };
     }
 
-    // Update user profile
-    const profile = userProfiles[uid];
+    // Get current profile
+    const profile = await getProfile(uid);
     if (!profile) {
       return { success: false, message: 'User profile not found. Please log in again.' };
     }
 
     // Update role to member if not already
-    if (profile.role !== 'member') {
-      profile.role = 'member';
-    }
+    const newRole = profile.role !== 'member' ? 'member' : profile.role;
 
     // Add club to memberships if not already there
-    if (!profile.memberships.includes(club.id)) {
-      profile.memberships = [...profile.memberships, club.id];
-    }
+    const newMemberships = profile.memberships.includes(club.id)
+      ? profile.memberships
+      : [...profile.memberships, club.id];
 
-    // Save updated profile
-    userProfiles[uid] = profile;
-    await setLS(LS_KEYS.USER_PROFILES, userProfiles);
+    // Update profile in Supabase
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({
+        role: newRole,
+        memberships: newMemberships,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('uid', uid);
+
+    if (error) {
+      console.error('Error updating user profile in Supabase:', error);
+      return { success: false, message: 'Failed to update membership. Please try again.' };
+    }
 
     return { 
       success: true, 

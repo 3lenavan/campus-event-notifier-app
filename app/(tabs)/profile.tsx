@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
 import { auth } from "../../src/lib/firebase";
-import { getLS, LS_KEYS } from "../../src/lib/localStorage";
+import { listClubs } from "../../src/services/clubsService";
 import { Club, Event } from "../../src/types";
 import { getUserLikedEvents, getUserFavoritedEvents } from "../../src/services/interactionsService";
 import { getEventsByIds } from "../../src/services/eventsService";
@@ -37,7 +37,7 @@ const Profile = () => {
   useEffect(() => {
     const loadClubs = async () => {
       try {
-        const clubsData = await getLS<Club[]>(LS_KEYS.CLUBS, []);
+        const clubsData = await listClubs();
         setClubs(clubsData);
       } catch (error) {
         console.error('Error loading clubs:', error);
@@ -69,7 +69,7 @@ const Profile = () => {
       ]);
 
       // Convert to ProfileEvent format
-      const clubsData = await getLS<Club[]>(LS_KEYS.CLUBS, []);
+      const clubsData = await listClubs();
       
       const convertToProfileEvent = (event: Event): ProfileEvent => {
         const date = new Date(event.dateISO);

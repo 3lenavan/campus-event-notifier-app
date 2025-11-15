@@ -3,8 +3,8 @@ import { getAuth } from "firebase/auth";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
-import { getLS, LS_KEYS } from "../../src/lib/localStorage";
 import { listApprovedEvents } from "../../src/services/eventsService";
+import { listClubs } from "../../src/services/clubsService";
 import { getEventsInteractions, toggleFavorite as toggleFavoriteService, toggleLike as toggleLikeService } from "../../src/services/interactionsService";
 import EventCard, { Event as BaseEvent } from "../event-card";
 
@@ -37,7 +37,7 @@ export default function HomeScreen() {
   const loadApproved = useCallback(async () => {
     try {
       const approved = await listApprovedEvents();
-      const clubs = (await getLS<any[]>(LS_KEYS.CLUBS, [])) || [];
+      const clubs = await listClubs();
       
       // Map events to FeedEvent format
       const eventsMapped: FeedEvent[] = approved.map((event) => {

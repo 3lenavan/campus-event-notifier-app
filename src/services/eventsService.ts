@@ -1,24 +1,38 @@
-import { getLS, LS_KEYS, setLS } from '../lib/localStorage';
 import { getEventPolicy } from '../lib/eventPolicy';
 import { CreateEventInput, Event } from '../types';
-
-/**
- * Generate a simple UUID for event IDs
- */
-const generateEventId = (): string => {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
-};
+import { supabase } from '../../data/supabaseClient';
 
 /**
  * Get all events sorted by creation date (newest first)
  */
 export const listEvents = async (): Promise<Event[]> => {
   try {
-    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
-    return events.sort((a, b) => b.createdAt - a.createdAt);
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error listing events from Supabase:', error);
+      return [];
+    }
+
+    // Transform Supabase data to Event interface
+    return (data || []).map((row: any) => ({
+      id: String(row.id),
+      title: row.title,
+      description: row.description,
+      clubId: String(row.club_id),
+      dateISO: row.date_iso,
+      location: row.location,
+      createdBy: row.created_by,
+      createdAt: new Date(row.created_at).getTime(),
+      status: row.status || 'pending',
+      moderationNote: row.moderation_note || undefined,
+    }));
   } catch (error) {
     console.error('Error listing events:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -27,13 +41,33 @@ export const listEvents = async (): Promise<Event[]> => {
  */
 export const listApprovedEvents = async (): Promise<Event[]> => {
   try {
-    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
-    return events
-      .filter(event => event.status === "approved")
-      .sort((a, b) => b.createdAt - a.createdAt);
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error listing approved events from Supabase:', error);
+      return [];
+    }
+
+    // Transform Supabase data to Event interface
+    return (data || []).map((row: any) => ({
+      id: String(row.id),
+      title: row.title,
+      description: row.description,
+      clubId: String(row.club_id),
+      dateISO: row.date_iso,
+      location: row.location,
+      createdBy: row.created_by,
+      createdAt: new Date(row.created_at).getTime(),
+      status: row.status || 'approved',
+      moderationNote: row.moderation_note || undefined,
+    }));
   } catch (error) {
     console.error('Error listing approved events:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -42,13 +76,33 @@ export const listApprovedEvents = async (): Promise<Event[]> => {
  */
 export const listClubEvents = async (clubId: string): Promise<Event[]> => {
   try {
-    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
-    return events
-      .filter(event => event.clubId === clubId)
-      .sort((a, b) => b.createdAt - a.createdAt);
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('club_id', parseInt(clubId))
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error listing club events from Supabase:', error);
+      return [];
+    }
+
+    // Transform Supabase data to Event interface
+    return (data || []).map((row: any) => ({
+      id: String(row.id),
+      title: row.title,
+      description: row.description,
+      clubId: String(row.club_id),
+      dateISO: row.date_iso,
+      location: row.location,
+      createdBy: row.created_by,
+      createdAt: new Date(row.created_at).getTime(),
+      status: row.status || 'pending',
+      moderationNote: row.moderation_note || undefined,
+    }));
   } catch (error) {
     console.error('Error listing club events:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -57,14 +111,36 @@ export const listClubEvents = async (clubId: string): Promise<Event[]> => {
  */
 export const getEventsByIds = async (eventIds: string[]): Promise<Event[]> => {
   try {
-    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
-    return events
-      .filter(event => eventIds.includes(event.id))
-      .filter(event => event.status === "approved") // Only return approved events
-      .sort((a, b) => new Date(a.dateISO).getTime() - new Date(b.dateISO).getTime()); // Sort by date
+    if (eventIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .in('id', eventIds.map(id => parseInt(id)))
+      .eq('status', 'approved')
+      .order('date_iso', { ascending: true });
+
+    if (error) {
+      console.error('Error getting events by IDs from Supabase:', error);
+      return [];
+    }
+
+    // Transform Supabase data to Event interface
+    return (data || []).map((row: any) => ({
+      id: String(row.id),
+      title: row.title,
+      description: row.description,
+      clubId: String(row.club_id),
+      dateISO: row.date_iso,
+      location: row.location,
+      createdBy: row.created_by,
+      createdAt: new Date(row.created_at).getTime(),
+      status: row.status || 'approved',
+      moderationNote: row.moderation_note || undefined,
+    }));
   } catch (error) {
     console.error('Error getting events by IDs:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -73,31 +149,42 @@ export const getEventsByIds = async (eventIds: string[]): Promise<Event[]> => {
  */
 export const createEvent = async (eventInput: CreateEventInput, createdBy: string): Promise<Event> => {
   try {
-    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
-    
     // Get event policy to determine status
     const eventPolicy = await getEventPolicy();
     const status = eventPolicy.moderationMode === "off" ? "approved" : "pending";
     
-    const newEvent: Event = {
-      id: generateEventId(),
-      title: eventInput.title,
-      description: eventInput.description,
-      clubId: eventInput.clubId,
-      dateISO: eventInput.dateISO,
-      location: eventInput.location,
-      createdBy,
-      createdAt: Date.now(),
-      status,
-    };
+    const { data, error } = await supabase
+      .from('events')
+      .insert({
+        title: eventInput.title,
+        description: eventInput.description,
+        club_id: parseInt(eventInput.clubId),
+        date_iso: eventInput.dateISO,
+        location: eventInput.location,
+        created_by: createdBy,
+        status: status,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
 
-    // Add to events array
-    events.push(newEvent);
-    
-    // Save back to Local Storage
-    await setLS(LS_KEYS.EVENTS, events);
-    
-    return newEvent;
+    if (error) {
+      console.error('Error creating event in Supabase:', error);
+      throw error;
+    }
+
+    return {
+      id: String(data.id),
+      title: data.title,
+      description: data.description,
+      clubId: String(data.club_id),
+      dateISO: data.date_iso,
+      location: data.location,
+      createdBy: data.created_by,
+      createdAt: new Date(data.created_at).getTime(),
+      status: data.status || status,
+      moderationNote: data.moderation_note || undefined,
+    };
   } catch (error) {
     console.error('Error creating event:', error);
     throw error;
@@ -109,10 +196,20 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
  */
 export const getSavedEvents = async (uid: string): Promise<string[]> => {
   try {
-    return await getLS<string[]>(LS_KEYS.SAVED_EVENTS(uid), []);
+    const { data, error } = await supabase
+      .from('saved_events')
+      .select('event_id')
+      .eq('user_id', uid);
+
+    if (error) {
+      console.error('Error getting saved events from Supabase:', error);
+      return [];
+    }
+
+    return (data || []).map((row: any) => String(row.event_id));
   } catch (error) {
     console.error('Error getting saved events:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -121,10 +218,29 @@ export const getSavedEvents = async (uid: string): Promise<string[]> => {
  */
 export const saveEvent = async (uid: string, eventId: string): Promise<void> => {
   try {
-    const savedEvents = await getSavedEvents(uid);
-    if (!savedEvents.includes(eventId)) {
-      savedEvents.push(eventId);
-      await setLS(LS_KEYS.SAVED_EVENTS(uid), savedEvents);
+    // Check if already saved
+    const { data: existing } = await supabase
+      .from('saved_events')
+      .select('id')
+      .eq('user_id', uid)
+      .eq('event_id', parseInt(eventId))
+      .maybeSingle();
+
+    if (existing) {
+      return; // Already saved
+    }
+
+    const { error } = await supabase
+      .from('saved_events')
+      .insert({
+        user_id: uid,
+        event_id: parseInt(eventId),
+        created_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error('Error saving event to Supabase:', error);
+      throw error;
     }
   } catch (error) {
     console.error('Error saving event:', error);
@@ -137,9 +253,16 @@ export const saveEvent = async (uid: string, eventId: string): Promise<void> => 
  */
 export const unsaveEvent = async (uid: string, eventId: string): Promise<void> => {
   try {
-    const savedEvents = await getSavedEvents(uid);
-    const filteredEvents = savedEvents.filter(id => id !== eventId);
-    await setLS(LS_KEYS.SAVED_EVENTS(uid), filteredEvents);
+    const { error } = await supabase
+      .from('saved_events')
+      .delete()
+      .eq('user_id', uid)
+      .eq('event_id', parseInt(eventId));
+
+    if (error) {
+      console.error('Error unsaving event from Supabase:', error);
+      throw error;
+    }
   } catch (error) {
     console.error('Error unsaving event:', error);
     throw error;
@@ -151,13 +274,34 @@ export const unsaveEvent = async (uid: string, eventId: string): Promise<void> =
  */
 export const getPendingEvents = async (clubId: string): Promise<Event[]> => {
   try {
-    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
-    return events
-      .filter(event => event.clubId === clubId && event.status === "pending")
-      .sort((a, b) => b.createdAt - a.createdAt);
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('club_id', parseInt(clubId))
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error getting pending events from Supabase:', error);
+      return [];
+    }
+
+    // Transform Supabase data to Event interface
+    return (data || []).map((row: any) => ({
+      id: String(row.id),
+      title: row.title,
+      description: row.description,
+      clubId: String(row.club_id),
+      dateISO: row.date_iso,
+      location: row.location,
+      createdBy: row.created_by,
+      createdAt: new Date(row.created_at).getTime(),
+      status: row.status || 'pending',
+      moderationNote: row.moderation_note || undefined,
+    }));
   } catch (error) {
     console.error('Error getting pending events:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -166,19 +310,15 @@ export const getPendingEvents = async (clubId: string): Promise<Event[]> => {
  */
 export const approveEvent = async (eventId: string): Promise<void> => {
   try {
-    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
-    const eventIndex = events.findIndex(event => event.id === eventId);
-    
-    if (eventIndex === -1) {
-      throw new Error('Event not found');
+    const { error } = await supabase
+      .from('events')
+      .update({ status: 'approved' })
+      .eq('id', parseInt(eventId));
+
+    if (error) {
+      console.error('Error approving event in Supabase:', error);
+      throw error;
     }
-    
-    events[eventIndex] = {
-      ...events[eventIndex],
-      status: "approved"
-    };
-    
-    await setLS(LS_KEYS.EVENTS, events);
   } catch (error) {
     console.error('Error approving event:', error);
     throw error;
@@ -190,20 +330,18 @@ export const approveEvent = async (eventId: string): Promise<void> => {
  */
 export const rejectEvent = async (eventId: string, moderationNote: string): Promise<void> => {
   try {
-    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
-    const eventIndex = events.findIndex(event => event.id === eventId);
-    
-    if (eventIndex === -1) {
-      throw new Error('Event not found');
+    const { error } = await supabase
+      .from('events')
+      .update({
+        status: 'rejected',
+        moderation_note: moderationNote,
+      })
+      .eq('id', parseInt(eventId));
+
+    if (error) {
+      console.error('Error rejecting event in Supabase:', error);
+      throw error;
     }
-    
-    events[eventIndex] = {
-      ...events[eventIndex],
-      status: "rejected",
-      moderationNote
-    };
-    
-    await setLS(LS_KEYS.EVENTS, events);
   } catch (error) {
     console.error('Error rejecting event:', error);
     throw error;

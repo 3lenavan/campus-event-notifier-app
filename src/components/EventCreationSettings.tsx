@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getEventPolicy, setEventPolicy, EventPolicy } from '../lib/eventPolicy';
-import { getLS, LS_KEYS } from '../lib/localStorage';
+import { listClubs } from '../services/clubsService';
 import { Club } from '../types';
 
 interface EventCreationSettingsProps {
@@ -32,7 +32,7 @@ export const EventCreationSettings: React.FC<EventCreationSettingsProps> = ({ on
     try {
       const [policyData, clubsData] = await Promise.all([
         getEventPolicy(),
-        getLS<Club[]>(LS_KEYS.CLUBS, [])
+        listClubs()
       ]);
       setPolicy(policyData);
       setClubs(clubsData || []);

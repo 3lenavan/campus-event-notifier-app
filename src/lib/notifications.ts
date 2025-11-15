@@ -1,8 +1,9 @@
 import { listApprovedEvents } from '../services/eventsService';
 import { Event } from '../types';
-import { getLS, LS_KEYS, setLS } from './localStorage';
+import { listClubs } from '../services/clubsService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Notification tracking keys
+// Notification tracking keys (still using AsyncStorage for per-user notification state)
 const NOTIFIED_KEYS = (uid: string) => `notifiedKeys:${uid}`;
 
 /**
@@ -56,7 +57,7 @@ const formatTimeForNotification = (dateISO: string): string => {
  */
 const getClubName = async (clubId: string): Promise<string> => {
   try {
-    const clubs = await getLS<any[]>(LS_KEYS.CLUBS, []);
+    const clubs = await listClubs();
     if (!clubs) return 'Unknown Club';
     const club = clubs.find(c => c.id === clubId);
     return club?.name || 'Unknown Club';
@@ -75,7 +76,8 @@ const shouldNotifyForEvent = async (
   timeWindow: '24h' | '1h'
 ): Promise<boolean> => {
   try {
-    const notifiedKeys = await getLS<string[]>(NOTIFIED_KEYS(uid), []);
+    const item = await AsyncStorage.getItem(NOTIFIED_KEYS(uid));
+    const notifiedKeys = item ? JSON.parse(item) : [];
     if (!notifiedKeys) return true;
     const key = `${event.id}:${timeWindow}`;
     return !notifiedKeys.includes(key);
@@ -94,13 +96,14 @@ const markEventAsNotified = async (
   timeWindow: '24h' | '1h'
 ): Promise<void> => {
   try {
-    const notifiedKeys = await getLS<string[]>(NOTIFIED_KEYS(uid), []);
+    const item = await AsyncStorage.getItem(NOTIFIED_KEYS(uid));
+    const notifiedKeys = item ? JSON.parse(item) : [];
     const key = `${event.id}:${timeWindow}`;
     const keys = notifiedKeys || [];
     
     if (!keys.includes(key)) {
       keys.push(key);
-      await setLS(NOTIFIED_KEYS(uid), keys);
+      await AsyncStorage.setItem(NOTIFIED_KEYS(uid), JSON.stringify(keys));
     }
   } catch (error) {
     console.error('Error marking event as notified:', error);
@@ -235,7 +238,7 @@ export const notifyApprovalUpdate = async (eventTitle: string, approved: boolean
  */
 export const clearNotificationHistory = async (uid: string): Promise<void> => {
   try {
-    await setLS(NOTIFIED_KEYS(uid), []);
+    await AsyncStorage.setItem(NOTIFIED_KEYS(uid), JSON.stringify([]));
     console.log('Notification history cleared for user:', uid);
   } catch (error) {
     console.error('Error clearing notification history:', error);

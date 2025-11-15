@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useAuthUser } from '../hooks/useAuthUser';
 import { getDefaultDenylist, validateEventInput } from '../lib/eventValidators';
-import { getLS, LS_KEYS } from '../lib/localStorage';
+import { listClubs } from '../services/clubsService';
 import { notifyNow } from '../lib/notifications';
 import { createEvent } from '../services/eventsService';
 import { Club } from '../types';
@@ -59,7 +59,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
   const loadClubs = async () => {
     try {
-      const clubsData = await getLS<Club[]>(LS_KEYS.CLUBS, []);
+      const clubsData = await listClubs();
       setClubs(clubsData || []);
     } catch (error) {
       console.error('Error loading clubs:', error);

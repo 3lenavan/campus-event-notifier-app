@@ -1,5 +1,5 @@
 import { getEventPolicy } from './eventPolicy';
-import { getLS, LS_KEYS } from './localStorage';
+import { listEvents } from '../services/eventsService';
 import { CreateEventInput, Event } from '../types';
 
 /**
@@ -150,7 +150,7 @@ export const validateEventInput = async (
     }
     
     // Check rate limits
-    const events = await getLS<Event[]>(LS_KEYS.EVENTS, []);
+    const events = await listEvents();
     
     // Check max events per club per day
     const today = new Date();

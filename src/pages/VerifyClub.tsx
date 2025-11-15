@@ -13,7 +13,7 @@ import {
     View,
 } from 'react-native';
 import { useAuthUser } from '../hooks/useAuthUser';
-import { getLS, LS_KEYS } from '../lib/localStorage';
+import { listClubs } from '../services/clubsService';
 import { verifyClubMembership } from '../services/profileService';
 import { Club } from '../types';
 
@@ -36,7 +36,7 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
 
   const loadClubs = async () => {
     try {
-      const clubsData = await getLS<Club[]>(LS_KEYS.CLUBS, []);
+      const clubsData = await listClubs();
       setClubs(clubsData || []);
     } catch (error) {
       console.error('Error loading clubs:', error);
