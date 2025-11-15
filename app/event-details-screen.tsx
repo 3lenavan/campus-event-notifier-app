@@ -28,7 +28,7 @@ import {
   toggleFavorite as toggleFavoriteService,
   toggleLike as toggleLikeService
 } from "../src/services/interactionsService";
-import * as FileSystem from "expo-file-system";
+import { documentDirectory, writeAsStringAsync, EncodingType } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 
 // Event interface
@@ -237,11 +237,14 @@ export default function EventDetails() {
 
       // Create file name
       const fileName = `${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
-      const fileUri = FileSystem.documentDirectory + fileName;
+      if (!documentDirectory) {
+        throw new Error('documentDirectory is not available');
+      }
+      const fileUri = documentDirectory + fileName;
 
       // Write file to device
-      await FileSystem.writeAsStringAsync(fileUri, icsContent, {
-        encoding: FileSystem.EncodingType.UTF8,
+      await writeAsStringAsync(fileUri, icsContent, {
+        encoding: EncodingType.UTF8,
       });
 
       // Check if sharing is available
