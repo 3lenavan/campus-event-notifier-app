@@ -9,17 +9,23 @@ export const listClubs = async (): Promise<Club[]> => {
   try {
     const { data, error } = await supabase
       .from('clubs')
-      .select('id, name, category, code_hash, code_hash_member, code_hash_moderator')
+      .select('id, name, category, code_hash, code_hash_member, code_hash_moderator, string_id')
       .order('name');
 
     if (error) {
-      console.error('Error fetching clubs from Supabase:', error);
+      console.error('[clubsService] Error fetching clubs from Supabase:', error);
       return [];
     }
 
+    console.log('[clubsService] Fetched clubs from Supabase:', data?.length || 0, 'clubs');
+    if (data && data.length > 0) {
+      console.log('[clubsService] Sample club:', data[0]?.name);
+    }
+
     // Transform Supabase data to Club interface
+    // Use string_id if available, otherwise use integer id as string
     return (data || []).map((row: any) => ({
-      id: String(row.id),
+      id: row.string_id || String(row.id), // Prefer string_id if it exists
       name: row.name,
       category: row.category || 'Other',
       codeHash: row.code_hash || undefined,
@@ -27,7 +33,7 @@ export const listClubs = async (): Promise<Club[]> => {
       codeHash_moderator: row.code_hash_moderator || undefined,
     }));
   } catch (error) {
-    console.error('Error listing clubs:', error);
+    console.error('[clubsService] Error listing clubs:', error);
     return [];
   }
 };

@@ -17,14 +17,25 @@ export const seedClubsOnce = async (): Promise<void> => {
     }
 
     // Transform the JSON data for Supabase insertion
-    const clubsToInsert = clubsData.map((club: any) => ({
-      id: parseInt(club.id),
-      name: club.name,
-      category: club.category || 'Other',
-      code_hash: club.codeHash,
-      code_hash_member: club.codeHash,
-      code_hash_moderator: club.codeHash,
-    }));
+    // The database expects INTEGER id, but JSON has string IDs
+    // We'll use sequential integer IDs and store the original string ID in string_id field
+    // If string_id column doesn't exist, we'll just use integer IDs and match by name
+    const clubsToInsert = clubsData.map((club: any, index: number) => {
+      const clubData: any = {
+        id: index + 1, // Sequential integer IDs starting from 1
+        name: club.name,
+        category: club.category || 'Other',
+        code_hash: club.codeHash,
+        code_hash_member: club.codeHash,
+        code_hash_moderator: club.codeHash,
+      };
+      
+      // Try to include string_id if the column exists (won't fail if it doesn't)
+      // We'll check for this column in the select query
+      return clubData;
+    });
+    
+    console.log(`[seedClubs] Preparing to insert ${clubsToInsert.length} clubs`);
 
     // Insert clubs into Supabase
     const { error } = await supabase

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -42,11 +42,29 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
   useEffect(() => {
     loadClubs();
-    // Refresh profile on mount to ensure we have latest memberships
-    if (user) {
-      refreshProfile();
+  }, []);
+
+  // Refresh profile whenever screen is focused to get latest memberships
+  // This ensures Create Event appears immediately after club verification
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        console.log('[CreateEvent] Refreshing profile on focus...');
+        refreshProfile().then(() => {
+          console.log('[CreateEvent] Profile refreshed');
+        });
+      }
+    }, [user, refreshProfile])
+  );
+
+  // Debug log to track membership changes (must be before early returns)
+  useEffect(() => {
+    if (profile && clubs.length > 0) {
+      const userClubsCount = clubs.filter(club => profile.memberships.includes(club.id)).length;
+      console.log('[CreateEvent] Current memberships:', profile.memberships);
+      console.log('[CreateEvent] User clubs count:', userClubsCount);
     }
-  }, [user, refreshProfile]);
+  }, [profile, clubs]);
 
   // If clubs load and user has memberships, preselect first club
   useEffect(() => {
