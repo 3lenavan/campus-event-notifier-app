@@ -13,8 +13,13 @@ export const listClubs = async (): Promise<Club[]> => {
       .order('name');
 
     if (error) {
-      console.error('Error fetching clubs from Supabase:', error);
+      console.error('[clubsService] Error fetching clubs from Supabase:', error);
       return [];
+    }
+
+    console.log('[clubsService] Fetched clubs from Supabase:', data?.length || 0, 'clubs');
+    if (data && data.length > 0) {
+      console.log('[clubsService] Sample club:', data[0]?.name);
     }
 
     // Transform Supabase data to Club interface
@@ -29,7 +34,7 @@ export const listClubs = async (): Promise<Club[]> => {
       created_at: row.created_at,
     }));
   } catch (error) {
-    console.error('Error listing clubs:', error);
+    console.error('[clubsService] Error listing clubs:', error);
     return [];
   }
 };

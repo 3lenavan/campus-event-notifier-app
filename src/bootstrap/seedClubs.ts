@@ -21,10 +21,10 @@ export const seedClubsOnce = async (): Promise<void> => {
     const clubsToInsert = clubsData.map((club: any) => ({
       name: club.name,
       category: club.category || 'Other',
-    //  code_hash: club.codeHash,
-    // code_hash_member: club.codeHash,
-    // code_hash_moderator: club.codeHash,
+      code_hash: club.codeHash,
     }));
+    
+    console.log(`[seedClubs] Preparing to insert ${clubsToInsert.length} clubs`);
 
     // Insert clubs into Supabase
     const { error } = await supabase

@@ -36,25 +36,18 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
 
   const loadClubs = async () => {
     try {
+      console.log('[VerifyClub] Loading clubs...');
       const clubsData = await listClubs();
       setClubs(clubsData || []);
       console.log('[VerifyClub] Loaded clubs:', clubsData?.length || 0);
       if (clubsData && clubsData.length > 0) {
         console.log('[VerifyClub] Sample club names:', clubsData.slice(0, 5).map(c => c.name));
-        // Check if Computer Science club exists
-        const computerClub = clubsData.find(c => 
-          c.name.toLowerCase().includes('computer')
-        );
-        if (computerClub) {
-          console.log('[VerifyClub] Found Computer Science club:', computerClub.name);
-        } else {
-          console.log('[VerifyClub] WARNING: Computer Science club not found in loaded clubs');
-        }
+        console.log('[VerifyClub] Sample club IDs:', clubsData.slice(0, 3).map(c => c.id));
       } else {
         console.warn('[VerifyClub] WARNING: No clubs loaded! Database might be empty.');
       }
     } catch (error) {
-      console.error('Error loading clubs:', error);
+      console.error('[VerifyClub] Error loading clubs:', error);
       Alert.alert('Error', 'Failed to load clubs');
     }
   };
@@ -126,7 +119,8 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
     const nameMatch = club.name.toLowerCase().includes(searchText);
     const slugMatch = club.slug.toLowerCase().includes(searchText);
     const categoryMatch = club.category?.toLowerCase().includes(searchText);
-    return nameMatch || slugMatch || categoryMatch;
+    const idMatch = club.id.toLowerCase().includes(searchText);
+    return nameMatch || slugMatch || categoryMatch || idMatch;
   });
 
   const renderClubItem = ({ item }: { item: Club }) => (
@@ -185,13 +179,12 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
                   const searchText = text.toLowerCase().trim();
                   const filtered = clubs.filter(club => {
                     const nameMatch = club.name.toLowerCase().includes(searchText);
+                    const slugMatch = club.slug.toLowerCase().includes(searchText);
                     const idMatch = club.id.toLowerCase().includes(searchText);
                     const categoryMatch = club.category?.toLowerCase().includes(searchText);
-                    return nameMatch || idMatch || categoryMatch;
+                    return nameMatch || slugMatch || idMatch || categoryMatch;
                   });
-                  console.log('[VerifyClub] Search:', text);
-                  console.log('[VerifyClub] Total clubs available:', clubs.length);
-                  console.log('[VerifyClub] Filtered results:', filtered.length);
+                  console.log('[VerifyClub] Search:', text, 'Found:', filtered.length, 'clubs');
                   if (filtered.length > 0) {
                     console.log('[VerifyClub] First match:', filtered[0].name);
                   } else if (clubs.length > 0) {
