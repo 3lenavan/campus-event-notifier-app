@@ -1,16 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuthUser } from '../hooks/useAuthUser';
 import { listClubs } from '../services/clubsService';
@@ -72,7 +72,11 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
 
     setLoading(true);
     try {
-      const result = await verifyClubMembership(user.uid, clubInput.trim(), codeInput.trim());
+      const result = await verifyClubMembership(
+        user.uid,
+        clubInput.trim(), // this is the slug now
+        codeInput.trim()
+      );
       
       if (result.success) {
         // Refresh profile to get updated memberships immediately
@@ -120,16 +124,16 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
     const searchText = clubInput.toLowerCase().trim();
     if (!searchText) return false;
     const nameMatch = club.name.toLowerCase().includes(searchText);
-    const idMatch = club.id.toLowerCase().includes(searchText);
+    const slugMatch = club.slug.toLowerCase().includes(searchText);
     const categoryMatch = club.category?.toLowerCase().includes(searchText);
-    return nameMatch || idMatch || categoryMatch;
+    return nameMatch || slugMatch || categoryMatch;
   });
 
   const renderClubItem = ({ item }: { item: Club }) => (
     <TouchableOpacity
       style={styles.clubItem}
       onPress={() => {
-        setClubInput(item.name);
+        setClubInput(item.slug);
         setShowClubList(false);
       }}
     >
@@ -195,7 +199,7 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
                   }
                 }
               }}
-              autoCapitalize="words"
+              autoCapitalize="none"
             />
             {clubInput.length > 0 && (
               <TouchableOpacity
@@ -215,7 +219,7 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
                 <FlatList
                   data={filteredClubs.slice(0, 5)}
                   renderItem={renderClubItem}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={(item) => item.slug}
                   style={styles.clubListContent}
                   keyboardShouldPersistTaps="handled"
                 />
@@ -270,10 +274,11 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
         {profile && profile.memberships.length > 0 && (
           <View style={styles.currentMemberships}>
             <Text style={styles.membershipsTitle}>Your Memberships:</Text>
-            {profile.memberships.map((clubId) => {
-              const club = clubs.find(c => c.id === clubId);
+
+            {profile.memberships.map((clubSlug) => {
+              const club = clubs.find(c => c.slug === clubSlug); // FIXED ✔
               return club ? (
-                <View key={clubId} style={styles.membershipItem}>
+                <View key={clubSlug} style={styles.membershipItem}>
                   <Ionicons name="checkmark-circle" size={16} color="#10B981" />
                   <Text style={styles.membershipText}>{club.name}</Text>
                 </View>

@@ -20,11 +20,8 @@ export const getProfile = async (uid: string): Promise<UserProfile | null> => {
       return null;
     }
 
-    if (!data) {
-      return null;
-    }
+    if (!data) return null;
 
-    // Transform Supabase data to UserProfile interface
     return {
       uid: data.uid,
       name: data.name,
@@ -45,10 +42,8 @@ export const getProfile = async (uid: string): Promise<UserProfile | null> => {
 export const upsertProfileFromAuth = async (user: User): Promise<UserProfile> => {
   try {
     const emailNormalized = (user.email || '').trim().toLowerCase();
-    
-    // Check if profile exists
     const existing = await getProfile(user.uid);
-    
+
     const profileData = {
       uid: user.uid,
       name: user.displayName || user.email?.split('@')[0] || 'Unknown User',
@@ -58,7 +53,6 @@ export const upsertProfileFromAuth = async (user: User): Promise<UserProfile> =>
       is_admin: (ADMIN_EMAILS as readonly string[]).includes(emailNormalized),
     };
 
-    // Upsert to Supabase
     const { data, error } = await supabase
       .from('user_profiles')
       .upsert({
@@ -69,9 +63,7 @@ export const upsertProfileFromAuth = async (user: User): Promise<UserProfile> =>
         memberships: profileData.memberships,
         is_admin: profileData.is_admin,
         updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'uid',
-      })
+      }, { onConflict: 'uid' })
       .select()
       .single();
 
@@ -95,87 +87,89 @@ export const upsertProfileFromAuth = async (user: User): Promise<UserProfile> =>
 };
 
 /**
- * Verify club membership using verification code
+ * Verify club membership using slug + hashed verification code
+ * Returns updated profile!
  */
 export const verifyClubMembership = async (
   uid: string,
-  clubInput: string,
+  clubSlug: string,
   codePlaintext: string
-): Promise<{ success: boolean; message: string; club?: Club }> => {
+): Promise<{ success: boolean; message: string; club?: Club; profile?: UserProfile }> => {
   try {
-    // Get clubs from Supabase
-    const { listClubs } = await import('./clubsService');
-    const clubs = await listClubs();
+    const hashedCode = await sha256(codePlaintext);
+
+    // Find club matching slug + code
+    const { data: clubs, error } = await supabase
+      .from('clubs')
+      .select('*')
+      .eq('slug', clubSlug)
+      .eq('code_hash', hashedCode)
+      .limit(1);
+
+    if (error) {
+      console.error('Supabase error verifying club:', error);
+      return { success: false, message: 'Verification failed. Try again.' };
+    }
 
     if (!clubs || clubs.length === 0) {
-      return { success: false, message: 'No clubs found. Please contact support.' };
+      return { success: false, message: 'Invalid club or verification code.' };
     }
 
-    // Find club by ID or name
-    const club = clubs.find(c => c.id === clubInput || c.name.toLowerCase() === clubInput.toLowerCase());
-    
-    if (!club) {
-      return { success: false, message: 'Club not found. Please check the club name or ID.' };
-    }
+    const club = clubs[0];
 
-    // Hash the provided code
-    const providedHash = await sha256(codePlaintext);
-    
-    // Compare hashes: support member/moderator specific hashes and legacy
-    const validHashes = [club.codeHash_member, club.codeHash_moderator, club.codeHash].filter(Boolean);
-    if (!validHashes.includes(providedHash)) {
-      return { success: false, message: 'Invalid verification code.' };
-    }
-
-    // Get current profile
+    // Fetch profile
     const profile = await getProfile(uid);
     if (!profile) {
-      return { success: false, message: 'User profile not found. Please log in again.' };
+      return { success: false, message: 'User profile not found.' };
     }
 
-    // Update role to member if not already
-    const newRole = profile.role !== 'member' ? 'member' : profile.role;
+    const memberships = profile.memberships || [];
 
-    // Add club to memberships if not already there
-    const newMemberships = profile.memberships.includes(club.id)
-      ? profile.memberships
-      : [...profile.memberships, club.id];
+    // Already member
+    if (memberships.includes(club.slug)) {
+      const refreshed = await getProfile(uid);
+      return { success: true, message: 'Already a member.', club, profile: refreshed || profile };
+    }
 
-    // Update profile in Supabase
-    const { error } = await supabase
+    // Add membership
+    const updatedMemberships = [...memberships, club.slug];
+
+    const { error: updateError } = await supabase
       .from('user_profiles')
       .update({
-        role: newRole,
-        memberships: newMemberships,
+        memberships: updatedMemberships,
         updated_at: new Date().toISOString(),
       })
       .eq('uid', uid);
 
-    if (error) {
-      console.error('Error updating user profile in Supabase:', error);
-      return { success: false, message: 'Failed to update membership. Please try again.' };
+    if (updateError) {
+      console.error('Error updating user memberships:', updateError);
+      return { success: false, message: 'Failed to update membership.' };
     }
 
-    return { 
-      success: true, 
+    // *** IMPORTANT: REFRESH UPDATED PROFILE ***
+    const updatedProfile = await getProfile(uid);
+
+    return {
+      success: true,
       message: `Successfully joined ${club.name}!`,
-      club 
+      club,
+      profile: updatedProfile!,
     };
   } catch (error) {
-    console.error('Error verifying club membership:', error);
-    return { success: false, message: 'An error occurred during verification.' };
+    console.error('Unexpected verification error:', error);
+    return { success: false, message: 'Unexpected error occurred.' };
   }
 };
 
 /**
- * Check if user is a member of a specific club
+ * Check if user is a member of a club
  */
-export const isClubMember = async (uid: string, clubId: string): Promise<boolean> => {
+export const isClubMember = async (uid: string, clubSlug: string): Promise<boolean> => {
   try {
     const profile = await getProfile(uid);
-    return profile?.role === 'member' && profile.memberships.includes(clubId) || false;
-  } catch (error) {
-    console.error('Error checking club membership:', error);
+    return profile?.memberships.includes(clubSlug) || false;
+  } catch {
     return false;
   }
 };
