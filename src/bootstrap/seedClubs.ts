@@ -17,8 +17,8 @@ export const seedClubsOnce = async (): Promise<void> => {
     }
 
     // Transform the JSON data for Supabase insertion
+    // Note: Let database auto-generate integer IDs, don't try to parse string IDs
     const clubsToInsert = clubsData.map((club: any) => ({
-      id: parseInt(club.id),
       name: club.name,
       category: club.category || 'Other',
       code_hash: club.codeHash,

@@ -38,6 +38,21 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
     try {
       const clubsData = await listClubs();
       setClubs(clubsData || []);
+      console.log('[VerifyClub] Loaded clubs:', clubsData?.length || 0);
+      if (clubsData && clubsData.length > 0) {
+        console.log('[VerifyClub] Sample club names:', clubsData.slice(0, 5).map(c => c.name));
+        // Check if Computer Science club exists
+        const computerClub = clubsData.find(c => 
+          c.name.toLowerCase().includes('computer')
+        );
+        if (computerClub) {
+          console.log('[VerifyClub] Found Computer Science club:', computerClub.name);
+        } else {
+          console.log('[VerifyClub] WARNING: Computer Science club not found in loaded clubs');
+        }
+      } else {
+        console.warn('[VerifyClub] WARNING: No clubs loaded! Database might be empty.');
+      }
     } catch (error) {
       console.error('Error loading clubs:', error);
       Alert.alert('Error', 'Failed to load clubs');
@@ -61,7 +76,13 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
       
       if (result.success) {
         // Refresh profile to get updated memberships immediately
+        // Wait for refresh to complete before showing success message
+        console.log('[VerifyClub] Verification successful, refreshing profile...');
         await refreshProfile();
+        console.log('[VerifyClub] Profile refreshed after verification');
+        
+        // Give a small delay to ensure profile state is updated across all components
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         Alert.alert(
           '✅ Membership Confirmed!', 
@@ -95,10 +116,14 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
     }
   };
 
-  const filteredClubs = clubs.filter(club =>
-    club.name.toLowerCase().includes(clubInput.toLowerCase()) ||
-    club.id.toLowerCase().includes(clubInput.toLowerCase())
-  );
+  const filteredClubs = clubs.filter(club => {
+    const searchText = clubInput.toLowerCase().trim();
+    if (!searchText) return false;
+    const nameMatch = club.name.toLowerCase().includes(searchText);
+    const idMatch = club.id.toLowerCase().includes(searchText);
+    const categoryMatch = club.category?.toLowerCase().includes(searchText);
+    return nameMatch || idMatch || categoryMatch;
+  });
 
   const renderClubItem = ({ item }: { item: Club }) => (
     <TouchableOpacity
@@ -151,6 +176,24 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
               onChangeText={(text) => {
                 setClubInput(text);
                 setShowClubList(text.length > 0);
+                // Debug log
+                if (text.length > 0) {
+                  const searchText = text.toLowerCase().trim();
+                  const filtered = clubs.filter(club => {
+                    const nameMatch = club.name.toLowerCase().includes(searchText);
+                    const idMatch = club.id.toLowerCase().includes(searchText);
+                    const categoryMatch = club.category?.toLowerCase().includes(searchText);
+                    return nameMatch || idMatch || categoryMatch;
+                  });
+                  console.log('[VerifyClub] Search:', text);
+                  console.log('[VerifyClub] Total clubs available:', clubs.length);
+                  console.log('[VerifyClub] Filtered results:', filtered.length);
+                  if (filtered.length > 0) {
+                    console.log('[VerifyClub] First match:', filtered[0].name);
+                  } else if (clubs.length > 0) {
+                    console.log('[VerifyClub] Sample club names:', clubs.slice(0, 3).map(c => c.name));
+                  }
+                }
               }}
               autoCapitalize="words"
             />
@@ -166,14 +209,23 @@ export const VerifyClub: React.FC<VerifyClubProps> = ({ onSuccess }) => {
             )}
           </View>
 
-          {showClubList && filteredClubs.length > 0 && (
+          {showClubList && clubInput.length > 0 && (
             <View style={styles.clubList}>
-              <FlatList
-                data={filteredClubs.slice(0, 5)}
-                renderItem={renderClubItem}
-                keyExtractor={(item) => item.id}
-                style={styles.clubListContent}
-              />
+              {filteredClubs.length > 0 ? (
+                <FlatList
+                  data={filteredClubs.slice(0, 5)}
+                  renderItem={renderClubItem}
+                  keyExtractor={(item) => item.id}
+                  style={styles.clubListContent}
+                  keyboardShouldPersistTaps="handled"
+                />
+              ) : (
+                <View style={styles.clubListEmpty}>
+                  <Text style={styles.clubListEmptyText}>
+                    No clubs found matching "{clubInput}"
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -299,11 +351,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    marginTop: -16,
     marginBottom: 16,
     maxHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1000,
   },
   clubListContent: {
     maxHeight: 200,
+  },
+  clubListEmpty: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  clubListEmptyText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   clubItem: {
     flexDirection: 'row',
