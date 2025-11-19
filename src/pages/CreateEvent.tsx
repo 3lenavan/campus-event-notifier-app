@@ -86,16 +86,30 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (event.type === 'set' && selectedDate) {
       setEventDate(selectedDate);
+      if (Platform.OS === 'ios') {
+        setShowDatePicker(false);
+      }
+    } else if (event.type === 'dismissed') {
+      setShowDatePicker(false);
     }
   };
 
   const handleTimeChange = (event: any, selectedDate?: Date) => {
-    setShowTimePicker(false);
-    if (selectedDate) {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (event.type === 'set' && selectedDate) {
       setEventDate(selectedDate);
+      if (Platform.OS === 'ios') {
+        setShowTimePicker(false);
+      }
+    } else if (event.type === 'dismissed') {
+      setShowTimePicker(false);
     }
   };
 
@@ -199,9 +213,19 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
           onPress: () => router.back(),
         },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating event:', error);
-      setValidationErrors(['Failed to create event']);
+      // Check for RLS permission error
+      if (error?.code === '42501' || error?.message?.includes('row-level security')) {
+        Alert.alert(
+          'Permission Error',
+          'Unable to create event. Please check your Supabase RLS policies.\n\nSee SUPABASE_RLS_POLICIES.sql for setup instructions.',
+          [{ text: 'OK' }]
+        );
+        setValidationErrors(['Database permission error. Please contact support.']);
+      } else {
+        setValidationErrors([error?.message || 'Failed to create event']);
+      }
     } finally {
       setLoading(false);
     }
@@ -246,7 +270,11 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.scrollView}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.content}>
           <View style={styles.header}>
             <TouchableOpacity
@@ -312,7 +340,12 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
               <View style={styles.dateTimeContainer}>
                 <TouchableOpacity
                   style={styles.dateTimeButton}
-                  onPress={() => setShowDatePicker(true)}
+                  onPress={() => {
+                    console.log('[CreateEvent] Date button pressed');
+                    setShowDatePicker(true);
+                  }}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Ionicons name="calendar-outline" size={20} color={pickerColor} />
                   <Text style={styles.dateTimeText}>
@@ -322,7 +355,12 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.dateTimeButton, styles.timeButton]}
-                  onPress={() => setShowTimePicker(true)}
+                  onPress={() => {
+                    console.log('[CreateEvent] Time button pressed');
+                    setShowTimePicker(true);
+                  }}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Ionicons name="time-outline" size={20} color={pickerColor} />
                   <Text style={styles.dateTimeText}>
@@ -414,6 +452,9 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   content: {
     flex: 1,
@@ -565,9 +606,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    minHeight: 48,
+    justifyContent: 'space-between',
   },
   timeButton: {
     marginTop: 8,

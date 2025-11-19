@@ -170,6 +170,10 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
 
     if (error) {
       console.error('Error creating event in Supabase:', error);
+      // Provide more helpful error message for RLS issues
+      if (error.code === '42501') {
+        throw new Error('Permission denied. Please check your Supabase RLS policies. See SUPABASE_RLS_POLICIES.sql for setup instructions.');
+      }
       throw error;
     }
 
