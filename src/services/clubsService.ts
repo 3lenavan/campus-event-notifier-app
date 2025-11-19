@@ -9,7 +9,7 @@ export const listClubs = async (): Promise<Club[]> => {
   try {
     const { data, error } = await supabase
       .from('clubs')
-      .select('id, name, category, code_hash, code_hash_member, code_hash_moderator')
+      .select('id, slug, name, category, verification_code, code_hash, image_url, created_at')
       .order('name');
 
     if (error) {
@@ -20,11 +20,13 @@ export const listClubs = async (): Promise<Club[]> => {
     // Transform Supabase data to Club interface
     return (data || []).map((row: any) => ({
       id: String(row.id),
+      slug: row.slug,
       name: row.name,
       category: row.category || 'Other',
-      codeHash: row.code_hash || undefined,
-      codeHash_member: row.code_hash_member || row.code_hash || undefined,
-      codeHash_moderator: row.code_hash_moderator || undefined,
+      verification_code: row.verification_code || '',
+      code_hash: row.code_hash || '',
+      image_url: row.image_url || null,
+      created_at: row.created_at,
     }));
   } catch (error) {
     console.error('Error listing clubs:', error);
@@ -34,30 +36,25 @@ export const listClubs = async (): Promise<Club[]> => {
 
 /**
  * Update club verification codes in Supabase
+ * Only updates code_hash (your DB does NOT have member/moderator columns)
  */
 export const updateClubCodes = async (
   clubId: string,
-  options: { newMemberCode?: string; newModeratorCode?: string }
+  options: { newCode?: string }
 ): Promise<Club> => {
   try {
     const updateData: any = {};
 
-    if (options.newMemberCode) {
-      const hash = await sha256(options.newMemberCode);
-      updateData.code_hash_member = hash;
-      // Keep legacy in sync for compatibility
+    // Your DB only has ONE code_hash field — so we update only that
+    if (options.newCode) {
+      const hash = await sha256(options.newCode);
       updateData.code_hash = hash;
-    }
-
-    if (options.newModeratorCode) {
-      const hash = await sha256(options.newModeratorCode);
-      updateData.code_hash_moderator = hash;
     }
 
     const { data, error } = await supabase
       .from('clubs')
       .update(updateData)
-      .eq('id', parseInt(clubId))
+      .eq('id', clubId) // id is stored as string in TS + Supabase bigint → leave as string
       .select()
       .single();
 
@@ -72,16 +69,16 @@ export const updateClubCodes = async (
 
     return {
       id: String(data.id),
+      slug: data.slug,
       name: data.name,
       category: data.category || 'Other',
-      codeHash: data.code_hash || undefined,
-      codeHash_member: data.code_hash_member || data.code_hash || undefined,
-      codeHash_moderator: data.code_hash_moderator || undefined,
+      verification_code: data.verification_code || '',
+      code_hash: data.code_hash || '',
+      image_url: data.image_url || null,
+      created_at: data.created_at,
     };
   } catch (error) {
     console.error('Error updating club codes:', error);
     throw error;
   }
 };
-
-

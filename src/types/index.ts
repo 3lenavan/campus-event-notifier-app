@@ -4,19 +4,20 @@ export interface UserProfile {
   name: string;
   email: string;
   role: 'student' | 'member';
-  memberships: string[]; // Array of club IDs
+  memberships: string[]; // Array of club slugs now
   isAdmin?: boolean;
 }
 
 // Club Types
 export interface Club {
-  id: string;
+  id: string;                 // numeric id from Supabase
+  slug: string;               // string identifier (e.g. "biology_club")
   name: string;
   category: string;
-  // Backward compat: keep legacy codeHash, prefer member/moderator specific hashes
-  codeHash?: string;
-  codeHash_member?: string;
-  codeHash_moderator?: string;
+  verification_code: string;  // plaintext code stored
+  code_hash: string;          // hashed code (used for verification)
+  image_url?: string;         // optional club image
+  created_at: string;
 }
 
 // Event Types
@@ -25,12 +26,12 @@ export interface Event {
   title: string;
   description: string;
   clubId: string;
-  dateISO: string; // ISO date string
+  dateISO: string;
   location: string;
-  createdBy: string; // User UID
-  createdAt: number; // Timestamp
+  createdBy: string;
+  createdAt: number;
   status: "pending" | "approved" | "rejected";
-  moderationNote?: string; // Optional note from moderator
+  moderationNote?: string;
 }
 
 // Service Types
@@ -43,6 +44,6 @@ export interface CreateEventInput {
 }
 
 export interface VerifyClubInput {
-  clubInput: string; // Club ID or name
-  codePlaintext: string; // The verification code to hash and match
+  clubInput: string;
+  codePlaintext: string;
 }

@@ -21,9 +21,9 @@ export const seedClubsOnce = async (): Promise<void> => {
       id: parseInt(club.id),
       name: club.name,
       category: club.category || 'Other',
-      code_hash: club.codeHash,
-      code_hash_member: club.codeHash,
-      code_hash_moderator: club.codeHash,
+    //  code_hash: club.codeHash,
+    // code_hash_member: club.codeHash,
+    // code_hash_moderator: club.codeHash,
     }));
 
     // Insert clubs into Supabase
