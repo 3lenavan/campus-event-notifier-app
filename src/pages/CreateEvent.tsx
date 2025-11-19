@@ -60,7 +60,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   // Debug log to track membership changes (must be before early returns)
   useEffect(() => {
     if (profile && clubs.length > 0) {
-      const userClubsCount = clubs.filter(club => profile.memberships.includes(club.id)).length;
+      const userClubsCount = clubs.filter(club => profile.memberships.includes(club.slug)).length;
       console.log('[CreateEvent] Current memberships:', profile.memberships);
       console.log('[CreateEvent] User clubs count:', userClubsCount);
     }
@@ -69,7 +69,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   // If clubs load and user has memberships, preselect first club
   useEffect(() => {
     if (!profile) return;
-    const eligible = clubs.filter(c => profile.memberships.includes(c.id));
+    const eligible = clubs.filter(c => profile.memberships.includes(c.slug));
     if (eligible.length > 0 && !selectedClubId) {
       setSelectedClubId(eligible[0].id);
     }
@@ -146,7 +146,8 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     }
 
     // Check if user is a member of the selected club
-    if (!profile.memberships.includes(selectedClubId)) {
+    const selectedClub = clubs.find(c => c.id === selectedClubId);
+    if (!selectedClub || !profile.memberships.includes(selectedClub.slug)) {
       setValidationErrors(['You must be a member of this club to create events']);
       return;
     }
@@ -218,7 +219,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   }
 
   // Filter clubs to only show ones the user is a member of
-  const userClubs = clubs.filter(club => profile.memberships.includes(club.id));
+  const userClubs = clubs.filter(club => profile.memberships.includes(club.slug));
 
   if (userClubs.length === 0) {
     return (

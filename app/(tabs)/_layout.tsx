@@ -1,7 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useAuthUser } from "../../src/hooks/useAuthUser";
 
 export default function Layout() {
+  const { profile } = useAuthUser();
+  const hasMemberships = profile?.memberships && profile.memberships.length > 0;
+
   return (
     <Tabs>
       <Tabs.Screen
@@ -29,6 +33,7 @@ export default function Layout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add-circle-outline" size={size} color={color} />
           ),
+          href: hasMemberships ? "/create-event" : null, // Hide tab if no memberships
         }}
       />
       <Tabs.Screen

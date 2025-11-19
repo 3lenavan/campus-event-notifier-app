@@ -269,10 +269,10 @@ const Profile = () => {
           <View style={styles.membershipsSection}>
             <Text style={styles.sectionTitle}>My Club Memberships</Text>
             <View style={styles.clubTagsContainer}>
-              {profile.memberships.map((clubId) => {
-                const club = clubs.find(c => c.id === clubId);
+              {profile.memberships.map((clubSlug) => {
+                const club = clubs.find(c => c.slug === clubSlug);
                 return club ? (
-                  <View key={clubId} style={styles.clubTag}>
+                  <View key={clubSlug} style={styles.clubTag}>
                     <Ionicons name="checkmark-circle" size={14} color="#10B981" />
                     <Text style={styles.clubTagText}>{club.name}</Text>
                   </View>
