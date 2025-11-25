@@ -18,7 +18,7 @@ export default function Discover() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Load club data from Supabase when screen mounts
+  // Load club data from Supabase when screen mounts
   useEffect(() => {
     async function loadClubs() {
       try {
@@ -33,7 +33,7 @@ export default function Discover() {
     loadClubs();
   }, []);
 
-  // ✅ Filter clubs by search text
+  // Filter clubs by search text
   const filteredClubs = clubs.filter((club) => {
     const name = club.name?.toLowerCase() ?? "";
     const category = club.category?.toLowerCase() ?? "";
