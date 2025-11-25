@@ -1,175 +1,193 @@
-import { User } from 'firebase/auth';
-import { supabase } from '../../data/supabaseClient';
-import { ADMIN_EMAILS } from '../lib/constants';
-import { sha256 } from '../lib/hash';
-import { Club, UserProfile } from '../types';
+import { User } from "firebase/auth";
+import { supabase } from "../../data/supabaseClient";
+import { ADMIN_EMAILS } from "../lib/constants";
+import { sha256 } from "../lib/hash";
+import { Club, UserProfile } from "../types";
 
 /**
- * Get user profile from Supabase
+ * Load user profile from Supabase
  */
 export const getProfile = async (uid: string): Promise<UserProfile | null> => {
   try {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('uid', uid)
+    // Load basic profile
+    const { data: profileData, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("uid", uid)
       .maybeSingle();
 
-    if (error) {
-      console.error('Error getting user profile from Supabase:', error);
+    if (profileError) {
+      console.error("Error loading profile:", profileError);
       return null;
     }
 
-    if (!data) return null;
+    if (!profileData) return null;
 
+    // Load memberships from join: clubs_users → clubs
+    const { data: membershipsData, error: membershipError } = await supabase
+      .from("clubs_users")
+      .select("clubs(slug)")
+      .eq("user_id", uid);
+
+    if (membershipError) {
+      console.error("Error loading memberships:", membershipError);
+      return null;
+    }
+
+    const memberships =
+      membershipsData?.map((row: any) => row.clubs?.slug).filter(Boolean) || [];
+
+    // Final user profile object
     return {
-      uid: data.uid,
-      name: data.name,
-      email: data.email,
-      role: data.role || 'student',
-      memberships: data.memberships || [],
-      isAdmin: data.is_admin || false,
-    };
-  } catch (error) {
-    console.error('Error getting user profile:', error);
+  uid: profileData.uid,
+  name: profileData.name,
+  email: profileData.email,
+  role: profileData.role || "student",
+  isAdmin: profileData.is_admin || false,
+  memberships, // <-- actual memberships loaded from clubs_users
+};
+
+  } catch (err) {
+    console.error("getProfile unexpected error:", err);
     return null;
   }
 };
 
 /**
- * Create or update user profile from Firebase Auth user
+ * Create/update profile when user logs in
  */
-export const upsertProfileFromAuth = async (user: User): Promise<UserProfile> => {
-  try {
-    const emailNormalized = (user.email || '').trim().toLowerCase();
-    const existing = await getProfile(user.uid);
+export const upsertProfileFromAuth = async (
+  user: User
+): Promise<UserProfile> => {
+  const emailNormalized = (user.email || "").trim().toLowerCase();
+  const isAdmin = ADMIN_EMAILS.includes(emailNormalized);
 
-    const profileData = {
-      uid: user.uid,
-      name: user.displayName || user.email?.split('@')[0] || 'Unknown User',
-      email: emailNormalized,
-      role: existing?.role || 'student',
-      memberships: existing?.memberships || [],
-      is_admin: (ADMIN_EMAILS as readonly string[]).includes(emailNormalized),
-    };
+  const profile = {
+    uid: user.uid,
+    name: user.displayName || user.email?.split("@")[0] || "Unknown User",
+    email: emailNormalized,
+    role: "student",
+    is_admin: isAdmin,
+    updated_at: new Date().toISOString(),
+  };
 
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .upsert({
-        uid: profileData.uid,
-        name: profileData.name,
-        email: profileData.email,
-        role: profileData.role,
-        memberships: profileData.memberships,
-        is_admin: profileData.is_admin,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'uid' })
-      .select()
-      .single();
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .upsert(profile, { onConflict: "uid" })
+    .select()
+    .single();
 
-    if (error) {
-      console.error('Error upserting user profile to Supabase:', error);
-      throw error;
-    }
-
-    return {
-      uid: data.uid,
-      name: data.name,
-      email: data.email,
-      role: data.role || 'student',
-      memberships: data.memberships || [],
-      isAdmin: data.is_admin || false,
-    };
-  } catch (error) {
-    console.error('Error upserting user profile:', error);
+  if (error) {
+    console.error("Error upserting profile:", error);
     throw error;
   }
+
+  // Return minimal profile (memberships will be refreshed via getProfile)
+  return {
+    uid: data.uid,
+    name: data.name,
+    email: data.email,
+    role: data.role || "student",
+    isAdmin: data.is_admin || false,
+    memberships: [], // <-- temporarily empty; getProfile() fills it
+  };
 };
 
 /**
- * Verify club membership using slug + hashed verification code
- * Returns updated profile!
+ * Verify club membership using slug + hashed code
  */
 export const verifyClubMembership = async (
   uid: string,
   clubSlug: string,
   codePlaintext: string
-): Promise<{ success: boolean; message: string; club?: Club; profile?: UserProfile }> => {
+): Promise<{ success: boolean; message: string; club?: Club }> => {
   try {
+    console.log("📌 VERIFY INPUT:");
+    console.log("clubSlug =", clubSlug);
+    console.log("codePlaintext =", codePlaintext);
+
+    // Normalize slug
+    const normalizedSlug = clubSlug.trim().toLowerCase();
+
+    // Hash verification code
     const hashedCode = await sha256(codePlaintext);
 
-    // Find club matching slug + code
+    // Find matching club
     const { data: clubs, error } = await supabase
-      .from('clubs')
-      .select('*')
-      .eq('slug', clubSlug)
-      .eq('code_hash', hashedCode)
+      .from("clubs")
+      .select("*")
+      .eq("slug", normalizedSlug)
+      .eq("code_hash", hashedCode)
       .limit(1);
 
+    console.log("📦 DB RESULT clubs =", clubs);
+
     if (error) {
-      console.error('Supabase error verifying club:', error);
-      return { success: false, message: 'Verification failed. Try again.' };
+      console.error("verifyClubMembership error:", error);
+      return { success: false, message: "Verification failed." };
     }
 
     if (!clubs || clubs.length === 0) {
-      return { success: false, message: 'Invalid club or verification code.' };
+      console.log("❌ No matching club for slug + hash");
+      return { success: false, message: "Invalid club or code." };
     }
 
     const club = clubs[0];
 
-    // Fetch profile
-    const profile = await getProfile(uid);
-    if (!profile) {
-      return { success: false, message: 'User profile not found.' };
+    // Check if the user is already a member
+    const { data: existing } = await supabase
+      .from("clubs_users")
+      .select("id")
+      .eq("user_id", uid)
+      .eq("club_id", club.id)
+      .maybeSingle();
+
+    if (existing) {
+      return {
+        success: true,
+        message: "Already a member of this club.",
+        club,
+      };
     }
 
-    const memberships = profile.memberships || [];
+    // Insert membership
+    const { error: insertError } = await supabase
+      .from("clubs_users")
+      .insert([{ user_id: uid, club_id: club.id }]);
 
-    // Already member
-    if (memberships.includes(club.slug)) {
-      const refreshed = await getProfile(uid);
-      return { success: true, message: 'Already a member.', club, profile: refreshed || profile };
+    if (insertError) {
+      return { success: false, message: "Could not save membership." };
     }
-
-    // Add membership
-    const updatedMemberships = [...memberships, club.slug];
-
-    const { error: updateError } = await supabase
-      .from('user_profiles')
-      .update({
-        memberships: updatedMemberships,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('uid', uid);
-
-    if (updateError) {
-      console.error('Error updating user memberships:', updateError);
-      return { success: false, message: 'Failed to update membership.' };
-    }
-
-    // *** IMPORTANT: REFRESH UPDATED PROFILE ***
-    const updatedProfile = await getProfile(uid);
 
     return {
       success: true,
-      message: `Successfully joined ${club.name}!`,
+      message: `Successfully joined ${club.name}.`,
       club,
-      profile: updatedProfile!,
     };
-  } catch (error) {
-    console.error('Unexpected verification error:', error);
-    return { success: false, message: 'Unexpected error occurred.' };
+  } catch (err) {
+    console.error("verifyClubMembership unexpected error:", err);
+    return { success: false, message: "Unexpected error occurred." };
   }
 };
 
 /**
- * Check if user is a member of a club
+ * Check club membership via clubs_users
  */
-export const isClubMember = async (uid: string, clubSlug: string): Promise<boolean> => {
+export const isClubMember = async (
+  uid: string,
+  clubId: number
+): Promise<boolean> => {
   try {
-    const profile = await getProfile(uid);
-    return profile?.memberships.includes(clubSlug) || false;
-  } catch {
+    const { data } = await supabase
+      .from("clubs_users")
+      .select("id")
+      .eq("user_id", uid)
+      .eq("club_id", clubId)
+      .maybeSingle();
+
+    return !!data;
+  } catch (err) {
+    console.error("isClubMember error:", err);
     return false;
   }
 };

@@ -3,10 +3,11 @@ export interface UserProfile {
   uid: string;
   name: string;
   email: string;
-  role: 'student' | 'member';
-  memberships: string[]; // Array of club slugs now
-  isAdmin?: boolean;
+  role: string;
+  isAdmin: boolean;
+  memberships: string[]; // <-- ADD THIS BACK
 }
+
 
 // Club Types
 export interface Club {

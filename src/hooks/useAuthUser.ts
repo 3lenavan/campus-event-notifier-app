@@ -22,13 +22,21 @@ export const useAuthUser = (): AuthState => {
   const [loading, setLoading] = useState(true);
 
   const loadProfile = useCallback(async (firebaseUser: User) => {
-    try {
-      const userProfile = await upsertProfileFromAuth(firebaseUser);
-      setProfile(userProfile);
-    } catch (error) {
-      console.error('Error loading profile:', error);
+  try {
+    // 1. Upsert base info (name/email/isAdmin)
+    await upsertProfileFromAuth(firebaseUser);
+
+    // 2. Load full profile including memberships
+    const fullProfile = await getProfile(firebaseUser.uid);
+
+    if (fullProfile) {
+      setProfile(fullProfile);
     }
-  }, []);
+  } catch (error) {
+    console.error('Error loading profile:', error);
+  }
+}, []);
+
 
   const refreshProfile = useCallback(async () => {
     if (!user) return;
