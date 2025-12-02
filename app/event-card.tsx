@@ -111,151 +111,101 @@ export function EventCard({
     );
   }
 
-  // Full event card
+  // Full event card - Travel app style
   return (
     <TouchableOpacity
       style={styles.card}
       onPress={() => onPress(event)}
-      activeOpacity={0.8}
+      activeOpacity={0.9}
     >
-      {event.imageUrl && (
+      <View style={styles.imageContainer}>
         <Image
-          source={{ uri: event.imageUrl }}
+          source={{ 
+            uri: event.imageUrl || "https://via.placeholder.com/400x300.png?text=Event+Image"
+          }}
           style={styles.image}
           resizeMode="cover"
         />
-      )}
-
-      <View style={styles.cardContent}>
-        <View style={styles.rowBetween}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title} numberOfLines={2}>
-              {event.title}
-            </Text>
-            <Text style={styles.description} numberOfLines={2}>
-              {event.description}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: getCategoryColor(event.category) },
-            ]}
-          >
-            <Text style={styles.badgeText}>{event.category}</Text>
-          </View>
-        </View>
-
-        <View style={styles.details}>
-          <View style={styles.iconItem}>
-            <Ionicons
-              name="calendar-outline"
-              size={16}
-              color="#6B7280"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.detailText}>{formatDate(event.date)}</Text>
-          </View>
-
-          <View style={styles.iconItem}>
-            <Ionicons
-              name="time-outline"
-              size={16}
-              color="#6B7280"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.detailText}>{event.time}</Text>
-          </View>
-
-          <View style={styles.iconItem}>
-            <Ionicons
-              name="location-outline"
-              size={16}
-              color="#6B7280"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.detailText}>{event.location}</Text>
-          </View>
-
-          <View style={styles.iconItem}>
-            <Ionicons
-              name="people-outline"
-              size={16}
-              color="#6B7280"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.detailText}>
-              {event.attendees} attending
-              {event.maxAttendees && ` / ${event.maxAttendees} max`}
-            </Text>
-          </View>
-        </View>
-
-        {/* Action row similar to Instagram: like and favorite */}
+        {/* Heart icon overlay */}
         {(onLike || onFavorite) && (
-          <View style={styles.actionRow}>
+          <View style={styles.imageOverlay}>
             {onLike && (
               <TouchableOpacity
-                style={styles.actionButton}
+                style={styles.heartButton}
                 onPress={(e) => {
                   e.stopPropagation?.();
                   onLike(event.id);
                 }}
-                activeOpacity={0.7}
+                activeOpacity={0.8}
               >
                 <Ionicons
                   name={liked ? "heart" : "heart-outline"}
-                  size={22}
-                  color={liked ? "#EF4444" : "#111827"}
-                  style={{ marginRight: 6 }}
+                  size={24}
+                  color={liked ? "#EF4444" : "#FFFFFF"}
                 />
-                {typeof likesCount === "number" && (
-                  <Text style={styles.likesText}>{likesCount}</Text>
-                )}
               </TouchableOpacity>
             )}
-
             {onFavorite && (
               <TouchableOpacity
-                style={styles.actionButton}
+                style={styles.bookmarkButton}
                 onPress={(e) => {
                   e.stopPropagation?.();
                   onFavorite(event.id);
                 }}
-                activeOpacity={0.7}
+                activeOpacity={0.8}
               >
                 <Ionicons
                   name={favorited ? "bookmark" : "bookmark-outline"}
-                  size={22}
-                  color={favorited ? "#111827" : "#111827"}
-                  style={{ marginRight: 2 }}
+                  size={24}
+                  color={favorited ? "#3B82F6" : "#FFFFFF"}
                 />
               </TouchableOpacity>
             )}
           </View>
         )}
+      </View>
 
-        {onRSVP && (
-          <TouchableOpacity
-            style={[
-              styles.rsvpButton,
-              event.isUserAttending && styles.cancelButton,
-            ]}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              onRSVP(event.id);
-            }}
-          >
-            <Text
-              style={[
-                styles.rsvpText,
-                event.isUserAttending && styles.cancelText,
-              ]}
-            >
-              {event.isUserAttending ? "Cancel RSVP" : "RSVP"}
-            </Text>
-          </TouchableOpacity>
-        )}
+      <View style={styles.cardContent}>
+        <View style={styles.headerRow}>
+          <View style={styles.locationRow}>
+            <Ionicons name="location-outline" size={14} color="#6B7280" />
+            <Text style={styles.locationText}>{event.location}</Text>
+          </View>
+          {typeof likesCount === "number" && likesCount > 0 && (
+            <View style={styles.ratingRow}>
+              <Ionicons name="heart" size={14} color="#EF4444" />
+              <Text style={styles.ratingText}>{likesCount}</Text>
+            </View>
+          )}
+        </View>
+
+        <Text style={styles.title} numberOfLines={2}>
+          {event.title}
+        </Text>
+
+        <Text style={styles.description} numberOfLines={2}>
+          {event.description}
+        </Text>
+
+        <View style={styles.metaRow}>
+          <View style={styles.metaItem}>
+            <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+            <Text style={styles.metaText}>{formatDate(event.date)}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Ionicons name="time-outline" size={16} color="#6B7280" />
+            <Text style={styles.metaText}>{event.time}</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.seeMoreButton}
+          onPress={() => onPress(event)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.seeMoreText}>See more</Text>
+          <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -263,52 +213,143 @@ export function EventCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    marginBottom: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    marginBottom: 24,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+    borderWidth: 0.5,
+    borderColor: "#F3F4F6",
   },
-  image: { width: "100%", height: 140 },
-  cardContent: { padding: 12 },
-  title: { fontSize: 16, fontWeight: "600", color: "#111827" },
-  description: { fontSize: 13, color: "#6B7280", marginTop: 2 },
+  imageContainer: {
+    position: "relative",
+    width: "100%",
+    height: 240,
+  },
+  image: { 
+    width: "100%", 
+    height: "100%",
+  },
+  imageOverlay: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    flexDirection: "row",
+    gap: 12,
+  },
+  heartButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    backdropFilter: "blur(10px)",
+  },
+  bookmarkButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    backdropFilter: "blur(10px)",
+  },
+  cardContent: { 
+    padding: 20,
+    backgroundColor: "#FFFFFF",
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  locationText: {
+    fontSize: 13,
+    color: "#6B7280",
+    fontWeight: "500",
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  ratingText: {
+    fontSize: 13,
+    color: "#EF4444",
+    fontWeight: "600",
+  },
+  title: { 
+    fontSize: 24, 
+    fontWeight: "700", 
+    color: "#111827",
+    marginBottom: 8,
+    letterSpacing: -0.5,
+    lineHeight: 30,
+  },
+  description: { 
+    fontSize: 15, 
+    color: "#6B7280", 
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  metaRow: {
+    flexDirection: "row",
+    gap: 20,
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  metaText: {
+    fontSize: 14,
+    color: "#374151",
+    fontWeight: "500",
+  },
+  seeMoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#111827",
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  seeMoreText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   badge: {
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 6,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  badgeText: { fontSize: 11, color: "#1F2937", fontWeight: "500" },
-  details: { marginTop: 8 },
-  iconItem: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
-  detailText: { fontSize: 13, color: "#334155" },
-  rsvpButton: {
-    backgroundColor: "#1D4ED8",
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginTop: 10,
-    alignItems: "center",
+  badgeText: { 
+    fontSize: 12, 
+    color: "#FFFFFF", 
+    fontWeight: "600",
+    letterSpacing: 0.2,
   },
-  rsvpText: { color: "white", fontWeight: "600" },
-  cancelButton: { backgroundColor: "#E5E7EB" },
-  cancelText: { color: "#111827" },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    marginTop: 8,
-    marginBottom: 2,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  likesText: { fontSize: 13, color: "#111827" },
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -316,20 +357,34 @@ const styles = StyleSheet.create({
   },
   compactCard: {
     backgroundColor: "white",
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 8,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+    borderWidth: 0.5,
+    borderColor: "#F3F4F6",
   },
-  compactTitle: { fontSize: 14, fontWeight: "500", color: "#111827" },
+  compactTitle: { 
+    fontSize: 16, 
+    fontWeight: "600", 
+    color: "#111827",
+    letterSpacing: -0.2,
+  },
   iconRow: {
     flexDirection: "row",
-    marginTop: 4,
+    marginTop: 8,
     alignItems: "center",
+    gap: 16,
   },
-  iconText: { fontSize: 12, color: "#6B7280" },
+  iconText: { 
+    fontSize: 13, 
+    color: "#6B7280",
+    fontWeight: "500",
+  },
 });
 
 export default EventCard;

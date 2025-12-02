@@ -440,9 +440,9 @@ export default function EventDetails() {
   if (!event) {
     return (
       <View style={styles.center}>
-        <Text>Event not found</Text>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>Go Back</Text>
+        <Text style={styles.notFoundText}>Event not found</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButtonText}>
+          <Text style={styles.backButtonTextLabel}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -477,188 +477,155 @@ export default function EventDetails() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back-outline" size={20} color="#111" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-
-        <View style={styles.iconRow}>
-          <TouchableOpacity onPress={() => console.log("Shared")} style={styles.iconButton}>
-            <Ionicons name="share-outline" size={20} color="#111" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={handleToggleFavorite} 
-            style={styles.iconButton}
-            disabled={!currentUser}
-          >
-            <Ionicons 
-              name={favorited ? "bookmark" : "bookmark-outline"} 
-              size={20} 
-              color={favorited ? "#3B82F6" : "#111"} 
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Banner */}
-      <View
-        style={[
-          styles.imageHeader,
-          { backgroundColor: getCategoryColor(event.category) },
-        ]}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        {event.imageUrl ? (
+        {/* Hero Image */}
+        <View style={styles.heroContainer}>
           <Image
-            source={{ uri: event.imageUrl }}
-            style={styles.eventImage}
+            source={{ 
+              uri: event.imageUrl || "https://via.placeholder.com/800x400.png?text=Event+Image"
+            }}
+            style={styles.heroImage}
             resizeMode="cover"
           />
-        ) : (
-          <View style={styles.imageOverlay}>
-            <Text style={styles.title}>{event.title}</Text>
-            <View style={[styles.badge, { backgroundColor: "#FFF3" }]}>
-              <Text style={styles.badgeText}>{event.category}</Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* Content */}
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Info */}
-        <View style={styles.card}>
-          <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={20} color="#6B7280" style={styles.icon} />
-            <View>
-              <Text style={styles.infoTitle}>{formatDate(event.date)}</Text>
-              <Text style={styles.infoSubtitle}>Date</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="time-outline" size={20} color="#6B7280" style={styles.icon} />
-            <View>
-              <Text style={styles.infoTitle}>{event.time}</Text>
-              <Text style={styles.infoSubtitle}>Time</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={20} color="#6B7280" style={styles.icon} />
-            <View>
-              <Text style={styles.infoTitle}>{event.location}</Text>
-              <Text style={styles.infoSubtitle}>Location</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="people-outline" size={20} color="#6B7280" style={styles.icon} />
-            <View>
-              <Text style={styles.infoTitle}>
-                {event.attendees} attending
-                {event.maxAttendees && ` / ${event.maxAttendees} max`}
-              </Text>
-              <Text style={styles.infoSubtitle}>Attendees</Text>
-            </View>
+          
+          {/* Header Overlay */}
+          <View style={styles.heroHeader}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backButton}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              onPress={handleToggleFavorite} 
+              style={styles.heartButton}
+              disabled={!currentUser}
+              activeOpacity={0.8}
+            >
+              <Ionicons 
+                name={favorited ? "heart" : "heart-outline"} 
+                size={24} 
+                color={favorited ? "#EF4444" : "#FFFFFF"} 
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Description */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>About this event</Text>
-          <Text style={styles.description}>
-            {event.fullDescription || event.description}
-          </Text>
+        {/* Content Section */}
+        <View style={styles.contentSection}>
+          <Text style={styles.title}>{event.title}</Text>
+          
+          <View style={styles.locationRow}>
+            <Ionicons name="location" size={16} color="#10B981" />
+            <Text style={styles.locationText}>{event.location}</Text>
+          </View>
 
-          {event.organizer && (
-            <View style={styles.organizerBlock}>
-              <Text style={styles.sectionTitle}>Organizer</Text>
-              <Text style={styles.organizerText}>{event.organizer}</Text>
+          {likeCount > 0 && (
+            <View style={styles.ratingRow}>
+              <Ionicons name="heart" size={16} color="#EF4444" />
+              <Text style={styles.ratingText}>{likeCount}</Text>
+              <Text style={styles.reviewsText}>likes</Text>
             </View>
           )}
-        </View>
 
-        {/* Like Section */}
-        <View style={styles.card}>
-          <TouchableOpacity 
-            style={styles.likeSection}
-            onPress={handleToggleLike}
-            disabled={!currentUser}
-          >
-            <Ionicons
-              name={liked ? "heart" : "heart-outline"}
-              size={24}
-              color={liked ? "#EF4444" : "#6B7280"}
-              style={styles.likeIcon}
-            />
-            <View style={styles.likeInfo}>
-              <Text style={styles.likeCount}>{likeCount} {likeCount === 1 ? 'like' : 'likes'}</Text>
-              <Text style={styles.likeSubtext}>
-                {liked ? "You like this event" : currentUser ? "Tap to like" : "Log in to like"}
-              </Text>
+          {/* Description with Read More */}
+          <View style={styles.descriptionSection}>
+            <Text style={styles.description} numberOfLines={undefined}>
+              {event.fullDescription || event.description}
+            </Text>
+          </View>
+
+          {/* Event Details */}
+          <View style={styles.detailsCard}>
+            <View style={styles.detailItem}>
+              <Ionicons name="calendar-outline" size={20} color="#6B7280" />
+              <View style={styles.detailContent}>
+                <Text style={styles.detailLabel}>Date</Text>
+                <Text style={styles.detailValue}>{formatDate(event.date)}</Text>
+              </View>
             </View>
-          </TouchableOpacity>
-        </View>
 
-        {/* RSVP */}
-        <View style={styles.card}>
+            <View style={styles.detailItem}>
+              <Ionicons name="time-outline" size={20} color="#6B7280" />
+              <View style={styles.detailContent}>
+                <Text style={styles.detailLabel}>Time</Text>
+                <Text style={styles.detailValue}>{event.time}</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailItem}>
+              <Ionicons name="people-outline" size={20} color="#6B7280" />
+              <View style={styles.detailContent}>
+                <Text style={styles.detailLabel}>Attendees</Text>
+                <Text style={styles.detailValue}>
+                  {event.attendees} {event.maxAttendees && `/ ${event.maxAttendees} max`}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actionsCard}>
+            <TouchableOpacity 
+              style={styles.likeButton}
+              onPress={handleToggleLike}
+              disabled={!currentUser}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={liked ? "heart" : "heart-outline"}
+                size={22}
+                color={liked ? "#EF4444" : "#6B7280"}
+              />
+              <Text style={[styles.actionText, liked && styles.likedText]}>
+                {likeCount} {likeCount === 1 ? 'like' : 'likes'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* RSVP Button */}
           {isEventPast ? (
-            <TouchableOpacity style={[styles.button, styles.disabled]}>
-              <Text style={styles.buttonText}>Event has ended</Text>
+            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton]}>
+              <Text style={styles.primaryButtonText}>Event has ended</Text>
             </TouchableOpacity>
           ) : isEventFull && !event.isUserAttending ? (
-            <TouchableOpacity style={[styles.button, styles.disabled]}>
-              <Text style={styles.buttonText}>Event is full</Text>
+            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton]}>
+              <Text style={styles.primaryButtonText}>Event is full</Text>
             </TouchableOpacity>
           ) : (
-            <>
-              <TouchableOpacity
+            <TouchableOpacity
+              style={[
+                styles.primaryButton,
+                event.isUserAttending && styles.cancelButtonStyle,
+              ]}
+              onPress={() => handleRSVP(event.id, event.title)}
+              activeOpacity={0.8}
+            >
+              <Text
                 style={[
-                  styles.button,
-                  event.isUserAttending ? styles.cancelButton : styles.rsvpButton,
+                  styles.primaryButtonText,
+                  event.isUserAttending && styles.cancelButtonText,
                 ]}
-                onPress={() => handleRSVP(event.id, event.title)}
               >
-                <Text
-                  style={[
-                    styles.buttonText,
-                    event.isUserAttending && styles.cancelText,
-                  ]}
-                >
-                  {event.isUserAttending ? "Cancel RSVP" : "RSVP to Event"}
-                </Text>
-              </TouchableOpacity>
-              <Text style={styles.rsvpNote}>
-                {event.isUserAttending
-                  ? "You're attending this event"
-                  : "Join other students at this event"}
+                {event.isUserAttending ? "Cancel RSVP" : "RSVP to Event"}
               </Text>
-            </>
+            </TouchableOpacity>
           )}
-        </View>
 
-        {/* Add to Calendar */}
-        <View style={styles.card}>
+          {/* Add to Calendar Button */}
           <TouchableOpacity
-            style={[styles.button, styles.calendarButton]}
+            style={styles.secondaryButton}
             onPress={() => handleAddToCalendar(event)}
+            activeOpacity={0.8}
           >
-            <Ionicons name="calendar-outline" size={20} color="white" style={styles.buttonIcon} />
-            <Text style={styles.buttonText}>Add to Calendar</Text>
+            <Ionicons name="calendar-outline" size={20} color="#111827" />
+            <Text style={styles.secondaryButtonText}>Add to Calendar</Text>
           </TouchableOpacity>
-          <Text style={styles.calendarNote}>
-            {Platform.OS === 'web' 
-              ? 'Download an .ics file to add this event to your calendar'
-              : Platform.OS === 'ios'
-              ? 'Tap to open in Calendar app or save to Files'
-              : 'Tap to share and add to your calendar app'}
-          </Text>
         </View>
       </ScrollView>
     </View>
@@ -667,101 +634,187 @@ export default function EventDetails() {
 
 // Styles
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB" },
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: {
+  scrollContent: { paddingBottom: 120 },
+  heroContainer: {
+    position: "relative",
+    width: "100%",
+    height: 320,
+  },
+  heroImage: {
+    width: "100%",
+    height: "100%",
+  },
+  heroHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 16,
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "white",
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  backButton: { flexDirection: "row", alignItems: "center" },
-  backText: { marginLeft: 6, fontSize: 15, color: "#111827", fontWeight: "500" },
-  iconRow: { flexDirection: "row" },
-  iconButton: { marginLeft: 12 },
-  imageHeader: { height: 160, justifyContent: "center", alignItems: "center" },
-  imageOverlay: { alignItems: "center" },
-  title: { color: "white", fontSize: 22, fontWeight: "bold", textAlign: "center" },
-  badge: { marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  badgeText: { color: "white", fontWeight: "500", fontSize: 12 },
-  scrollContent: { padding: 16, paddingBottom: 100 },
-  card: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  icon: { marginRight: 12 },
-  infoTitle: { fontSize: 15, fontWeight: "600", color: "#111827" },
-  infoSubtitle: { fontSize: 12, color: "#6B7280" },
-  sectionTitle: { fontSize: 16, fontWeight: "600", marginBottom: 6 },
-  description: { color: "#4B5563", fontSize: 14, lineHeight: 20 },
-  organizerBlock: {
-    marginTop: 14,
-    borderTopWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingTop: 10,
-  },
-  organizerText: { color: "#6B7280", fontSize: 14 },
-  button: {
-    borderRadius: 10,
-    paddingVertical: 12,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
     alignItems: "center",
-    marginTop: 4,
   },
-  rsvpButton: { backgroundColor: "#3B82F6" },
-  cancelButton: { backgroundColor: "#E5E7EB" },
-  buttonText: { color: "white", fontWeight: "600" },
-  cancelText: { color: "#111827" },
-  disabled: { backgroundColor: "#9CA3AF" },
-  rsvpNote: {
-    textAlign: "center",
+  heartButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  contentSection: {
+    padding: 20,
+    backgroundColor: "#FFFFFF",
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 12,
+    letterSpacing: -0.5,
+    lineHeight: 38,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 12,
+  },
+  locationText: {
+    fontSize: 15,
+    color: "#6B7280",
+    fontWeight: "500",
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 20,
+  },
+  ratingText: {
+    fontSize: 15,
+    color: "#EF4444",
+    fontWeight: "600",
+  },
+  reviewsText: {
+    fontSize: 15,
+    color: "#6B7280",
+  },
+  descriptionSection: {
+    marginBottom: 24,
+  },
+  description: {
+    fontSize: 16,
+    color: "#6B7280",
+    lineHeight: 24,
+  },
+  detailsCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+  },
+  detailItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 20,
+    gap: 16,
+  },
+  detailContent: {
+    flex: 1,
+  },
+  detailLabel: {
     fontSize: 13,
     color: "#6B7280",
-    marginTop: 6,
+    marginBottom: 4,
+    fontWeight: "500",
   },
-  calendarButton: { 
-    backgroundColor: "#10B981",
+  detailValue: {
+    fontSize: 16,
+    color: "#111827",
+    fontWeight: "600",
+  },
+  actionsCard: {
+    marginBottom: 20,
+  },
+  likeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+  },
+  actionText: {
+    fontSize: 15,
+    color: "#6B7280",
+    fontWeight: "500",
+  },
+  likedText: {
+    color: "#EF4444",
+  },
+  primaryButton: {
+    backgroundColor: "#111827",
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  cancelButtonStyle: {
+    backgroundColor: "#F3F4F6",
+  },
+  cancelButtonText: {
+    color: "#111827",
+  },
+  disabledButton: {
+    backgroundColor: "#9CA3AF",
+  },
+  secondaryButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    paddingVertical: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
-  buttonIcon: {
-    marginRight: 8,
-  },
-  calendarNote: {
-    textAlign: "center",
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 6,
-  },
-  eventImage: { width: "100%", height: "100%" },
-  likeSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  likeIcon: {
-    marginRight: 12,
-  },
-  likeInfo: {
-    flex: 1,
-  },
-  likeCount: {
+  secondaryButtonText: {
+    color: "#111827",
     fontSize: 16,
     fontWeight: "600",
-    color: "#111827",
   },
-  likeSubtext: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 2,
+  notFoundText: {
+    fontSize: 18,
+    color: "#374151",
+    fontWeight: "600",
+    marginBottom: 16,
+  },
+  backButtonText: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: "#111827",
+    borderRadius: 12,
+  },
+  backButtonTextLabel: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
