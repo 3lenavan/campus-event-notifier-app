@@ -157,9 +157,7 @@ export const toggleFavorite = async (userId: string, eventId: string): Promise<b
   }
 };
 
-
 // Combined Loader (Home + Discover + Profile use this)
-
 export const getEventsInteractions = async (
   userId: string,
   eventIds: string[]
