@@ -33,6 +33,7 @@ export interface Event {
   createdAt: number;
   status: "pending" | "approved" | "rejected";
   moderationNote?: string;
+  imageUrl?: string;
 }
 
 // Service Types
@@ -42,6 +43,7 @@ export interface CreateEventInput {
   clubId: string;
   dateISO: string;
   location: string;
+  imageUrl?: string;
 }
 
 export interface VerifyClubInput {

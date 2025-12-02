@@ -1,6 +1,10 @@
 // Imports
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+import { EncodingType } from "expo-file-system/legacy";
+import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Sharing from "expo-sharing";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   addDoc,
@@ -12,7 +16,9 @@ import {
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
+  Alert,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,8 +34,6 @@ import {
   toggleFavorite as toggleFavoriteService,
   toggleLike as toggleLikeService
 } from "../src/services/interactionsService";
-import { documentDirectory, writeAsStringAsync, EncodingType } from "expo-file-system";
-import * as Sharing from "expo-sharing";
 
 // Event interface
 interface Event {
@@ -88,7 +92,7 @@ export default function EventDetails() {
             category: "Club Event",
             attendees: 0,
             maxAttendees: undefined,
-            imageUrl: undefined,
+            imageUrl: foundEvent.imageUrl,
             isUserAttending: false,
             organizer: undefined,
             fullDescription: foundEvent.description,
@@ -208,59 +212,220 @@ export default function EventDetails() {
   // Handle Add to Calendar
   const handleAddToCalendar = async (event: Event) => {
     try {
-      // Create event date/time
-      const eventDateTime = new Date(`${event.date}T${event.time}`);
-      const startTime = eventDateTime.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-      const endTime = new Date(eventDateTime.getTime() + 2 * 60 * 60 * 1000) // Add 2 hours
-        .toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      // Parse event date/time - handle both ISO format and separate date/time
+      let eventDateTime: Date;
+      
+      if (event.date && event.time) {
+        // Try parsing as separate date and time strings
+        // event.date might be ISO string or YYYY-MM-DD format
+        const dateStr = event.date.includes('T') ? event.date.split('T')[0] : event.date;
+        eventDateTime = new Date(`${dateStr}T${event.time}`);
+      } else if (event.date) {
+        // Fallback to just date (assume noon)
+        eventDateTime = new Date(event.date);
+        eventDateTime.setHours(12, 0, 0, 0);
+      } else {
+        throw new Error('Event date is missing');
+      }
+
+      // Validate date
+      if (isNaN(eventDateTime.getTime())) {
+        throw new Error('Invalid event date/time');
+      }
+
+      // Format dates for ICS (YYYYMMDDTHHMMSSZ)
+      const formatICSDate = (date: Date): string => {
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const hours = String(date.getUTCHours()).padStart(2, '0');
+        const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+        const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+        return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+      };
+
+      const startTime = formatICSDate(eventDateTime);
+      const endTime = formatICSDate(new Date(eventDateTime.getTime() + 2 * 60 * 60 * 1000)); // Add 2 hours
       
       // Generate unique ID
-      const uid = `event-${event.id}-${Date.now()}`;
+      const uid = `event-${event.id}-${Date.now()}@campuseventnotifier.app`;
+      
+      // Escape special characters for ICS format
+      const escapeICS = (text: string): string => {
+        return text
+          .replace(/\\/g, '\\\\')
+          .replace(/;/g, '\\;')
+          .replace(/,/g, '\\,')
+          .replace(/\n/g, '\\n');
+      };
       
       // Create ICS content
       const icsContent = [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
         'PRODID:-//Campus Event Notifier//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
         'BEGIN:VEVENT',
         `UID:${uid}`,
         `DTSTART:${startTime}`,
         `DTEND:${endTime}`,
-        `SUMMARY:${event.title.replace(/,/g, '\\,')}`,
-        `DESCRIPTION:${event.description.replace(/,/g, '\\,').replace(/\n/g, '\\n')}\\n\\nLocation: ${event.location.replace(/,/g, '\\,')}`,
-        `LOCATION:${event.location.replace(/,/g, '\\,')}`,
-        `STATUS:CONFIRMED`,
-        `TRANSP:OPAQUE`,
+        `DTSTAMP:${formatICSDate(new Date())}`,
+        `SUMMARY:${escapeICS(event.title)}`,
+        `DESCRIPTION:${escapeICS(event.description || '')}\\n\\nLocation: ${escapeICS(event.location)}`,
+        `LOCATION:${escapeICS(event.location)}`,
+        'STATUS:CONFIRMED',
+        'TRANSP:OPAQUE',
         'END:VEVENT',
         'END:VCALENDAR'
       ].join('\r\n');
 
-      // Create file name
-      const fileName = `${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
-      if (!documentDirectory) {
-        throw new Error('documentDirectory is not available');
-      }
-      const fileUri = documentDirectory + fileName;
-
-      // Write file to device
-      await writeAsStringAsync(fileUri, icsContent, {
-        encoding: EncodingType.UTF8,
-      });
-
-      // Check if sharing is available
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        // Share the file
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'text/calendar',
-          dialogTitle: 'Add to Calendar',
-        });
+      // Handle web vs mobile differently
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        // Web: Use browser download
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        alert('Calendar file downloaded successfully!');
       } else {
-        alert('Sharing is not available on this device.');
+        // Mobile: Try file system first, fallback to data URI
+        const fileName = `${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
+        
+        // Check if file system is available
+        const cacheDir = FileSystem.cacheDirectory;
+        const docDir = FileSystem.documentDirectory;
+        const directory = cacheDir || docDir;
+        
+        if (directory) {
+          // File system is available - use it
+          try {
+            const fileUri = `${directory}${directory.endsWith('/') ? '' : '/'}${fileName}`;
+            console.log('Writing calendar file to:', fileUri);
+
+            // Write file to device
+            await FileSystem.writeAsStringAsync(fileUri, icsContent, {
+              encoding: EncodingType.UTF8,
+            });
+            console.log('File written successfully');
+
+            // Verify file exists
+            const fileInfo = await FileSystem.getInfoAsync(fileUri);
+            if (!fileInfo.exists) {
+              throw new Error('File was not created successfully');
+            }
+
+            console.log('File info:', fileInfo);
+
+            // Check if sharing is available
+            const isAvailable = await Sharing.isAvailableAsync();
+            console.log('Sharing available:', isAvailable);
+            
+            if (isAvailable) {
+              try {
+                // Share the file (opens share dialog)
+                await Sharing.shareAsync(fileUri, {
+                  mimeType: 'text/calendar',
+                  dialogTitle: Platform.OS === 'ios' 
+                    ? 'Add to Calendar' 
+                    : 'Add to Calendar',
+                  UTI: Platform.OS === 'ios' ? 'com.apple.ical.ics' : undefined,
+                });
+                console.log('File shared successfully');
+                
+                // Show helpful instructions after sharing
+                setTimeout(() => {
+                  if (Platform.OS === 'ios') {
+                    Alert.alert(
+                      'How to Add to Calendar',
+                      'In the share menu:\n\n' +
+                      '• Tap "Add to Calendar" to open directly\n' +
+                      '• Or tap "Save to Files" then open Files app\n' +
+                      '• Or email it to yourself and open on a computer',
+                      [{ text: 'OK' }]
+                    );
+                  } else {
+                    Alert.alert(
+                      'How to Add to Calendar',
+                      'In the share menu:\n\n' +
+                      '• Tap "Google Calendar" if available\n' +
+                      '• Or tap "Save" to download the file\n' +
+                      '• Then open it with your calendar app',
+                      [{ text: 'OK' }]
+                    );
+                  }
+                }, 500);
+                
+                return; // Success, exit early
+              } catch (shareError: any) {
+                console.error('Error sharing file:', shareError);
+                // Fall through to data URI fallback
+              }
+            }
+          } catch (fileError: any) {
+            console.error('Error with file system approach:', fileError);
+            // Fall through to data URI fallback
+          }
+        }
+        
+        // Fallback: Use data URI approach (works without file system)
+        try {
+          console.log('Using data URI fallback');
+          
+          // Create a data URI with the ICS content
+          // For mobile, we'll try to open it directly or copy to clipboard
+          const dataUri = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`;
+          
+          // Try to open with Linking (some apps support data URIs)
+          const canOpen = await Linking.canOpenURL(dataUri);
+          if (canOpen) {
+            await Linking.openURL(dataUri);
+            return;
+          }
+          
+          // If that doesn't work, try to copy content and show instructions
+          // Note: Clipboard API would require expo-clipboard, so we'll show the content
+          alert(
+            `Calendar file ready!\n\n` +
+            `Since file system access is limited, please:\n` +
+            `1. Copy this link and open it in your browser\n` +
+            `2. Or use the share button to copy the calendar data\n\n` +
+            `Alternatively, try opening this app in a development build instead of Expo Go.`
+          );
+          
+          // Try to share the data URI as text
+          if (await Sharing.isAvailableAsync()) {
+            // Create a temporary text file with instructions
+            const tempContent = `To add this event to your calendar, copy the following link and open it:\n\n${dataUri}\n\nOr use a calendar app that supports importing .ics files.`;
+            const tempFileUri = `${FileSystem.cacheDirectory || FileSystem.documentDirectory || ''}calendar_instructions.txt`;
+            
+            try {
+              if (FileSystem.cacheDirectory || FileSystem.documentDirectory) {
+                await FileSystem.writeAsStringAsync(tempFileUri, tempContent, {
+                  encoding: EncodingType.UTF8,
+                });
+                await Sharing.shareAsync(tempFileUri, {
+                  dialogTitle: 'Calendar Event Instructions',
+                });
+              }
+            } catch (e) {
+              // If even that fails, just show the data URI
+              console.log('Data URI:', dataUri);
+            }
+          }
+        } catch (fallbackError: any) {
+          console.error('Error with data URI fallback:', fallbackError);
+          alert(`Unable to create calendar file. This may be a limitation of Expo Go. Try using a development build or web version. Error: ${fallbackError?.message || fallbackError}`);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating calendar file:', error);
-      alert('Failed to create calendar file. Please try again.');
+      alert(`Failed to create calendar file: ${error.message || 'Please try again.'}`);
     }
   };
 
@@ -488,7 +653,11 @@ export default function EventDetails() {
             <Text style={styles.buttonText}>Add to Calendar</Text>
           </TouchableOpacity>
           <Text style={styles.calendarNote}>
-            Download an .ics file to add this event to your calendar
+            {Platform.OS === 'web' 
+              ? 'Download an .ics file to add this event to your calendar'
+              : Platform.OS === 'ios'
+              ? 'Tap to open in Calendar app or save to Files'
+              : 'Tap to share and add to your calendar app'}
           </Text>
         </View>
       </ScrollView>

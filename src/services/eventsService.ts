@@ -29,6 +29,7 @@ export const listEvents = async (): Promise<Event[]> => {
       createdAt: new Date(row.created_at).getTime(),
       status: row.status || 'pending',
       moderationNote: row.moderation_note || undefined,
+      imageUrl: row.image_url || undefined,
     }));
   } catch (error) {
     console.error('Error listing events:', error);
@@ -99,6 +100,7 @@ export const listClubEvents = async (clubId: string): Promise<Event[]> => {
       createdAt: new Date(row.created_at).getTime(),
       status: row.status || 'pending',
       moderationNote: row.moderation_note || undefined,
+      imageUrl: row.image_url || undefined,
     }));
   } catch (error) {
     console.error('Error listing club events:', error);
@@ -164,6 +166,7 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
         created_by: createdBy,
         status: status,
         created_at: new Date().toISOString(),
+        image_url: eventInput.imageUrl || null,
       })
       .select()
       .single();
@@ -188,6 +191,7 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
       createdAt: new Date(data.created_at).getTime(),
       status: data.status || status,
       moderationNote: data.moderation_note || undefined,
+      imageUrl: data.image_url || undefined,
     };
   } catch (error) {
     console.error('Error creating event:', error);
@@ -302,6 +306,7 @@ export const getPendingEvents = async (clubId: string): Promise<Event[]> => {
       createdAt: new Date(row.created_at).getTime(),
       status: row.status || 'pending',
       moderationNote: row.moderation_note || undefined,
+      imageUrl: row.image_url || undefined,
     }));
   } catch (error) {
     console.error('Error getting pending events:', error);

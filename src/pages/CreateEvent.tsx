@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -21,6 +22,7 @@ import { notifyNow } from '../lib/notifications';
 import { createEvent } from '../services/eventsService';
 import { supabase } from "../../data/supabaseClient";
 import { Club } from '../types';
+import { pickImage, uploadEventImage } from '../services/imageUploadService';
 
 interface CreateEventProps {
   clubId?: string;
@@ -43,6 +45,8 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Load clubs
   useEffect(() => {
@@ -107,6 +111,17 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     }
   };
 
+  const handlePickImage = async () => {
+    const imageUri = await pickImage();
+    if (imageUri) {
+      setSelectedImage(imageUri);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+  };
+
   const handleCreateEvent = async () => {
     if (!user) {
       Alert.alert('Error', 'Please sign in first');
@@ -130,8 +145,22 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     }
 
     setLoading(true);
+    let imageUrl: string | undefined = undefined;
 
     try {
+      // Upload image first if one is selected
+      if (selectedImage) {
+        setUploadingImage(true);
+        const uploadedUrl = await uploadEventImage(selectedImage, user.uid);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        } else {
+          Alert.alert('Warning', 'Failed to upload image. Event will be created without image.');
+        }
+        setUploadingImage(false);
+      }
+
+      // Create event with image URL
       const newEvent = await createEvent(
         {
           title: title.trim(),
@@ -139,6 +168,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
           clubId: selectedClubId,
           dateISO: eventDate.toISOString(),
           location: location.trim(),
+          imageUrl: imageUrl,
         },
         user.uid
       );
@@ -151,6 +181,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
       setValidationErrors([error.message || 'Failed to create event']);
     } finally {
       setLoading(false);
+      setUploadingImage(false);
     }
   };
 
@@ -240,6 +271,106 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
           </View>
 
           <View style={styles.inputContainer}>
+            <Text style={styles.label}>Date & Time *</Text>
+            <View style={styles.dateTimeContainer}>
+              <TouchableOpacity
+                style={styles.dateTimeButton}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={20} color="#1D4ED8" />
+                <Text style={styles.dateTimeText}>
+                  {eventDate.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dateTimeButton}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Ionicons name="time-outline" size={20} color="#1D4ED8" />
+                <Text style={styles.dateTimeText}>
+                  {eventDate.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                  })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            {showDatePicker && (
+              <DateTimePicker
+                value={eventDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  if (Platform.OS === 'android') {
+                    setShowDatePicker(false);
+                  }
+                  if (selectedDate) {
+                    // Preserve the time when changing date
+                    const newDate = new Date(selectedDate);
+                    newDate.setHours(eventDate.getHours());
+                    newDate.setMinutes(eventDate.getMinutes());
+                    setEventDate(newDate);
+                    if (Platform.OS === 'ios') {
+                      // On iOS, keep picker open but user can dismiss manually
+                    }
+                  } else if (Platform.OS === 'android') {
+                    // User cancelled on Android
+                    setShowDatePicker(false);
+                  }
+                }}
+                minimumDate={new Date()}
+              />
+            )}
+            
+            {showTimePicker && (
+              <DateTimePicker
+                value={eventDate}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedTime) => {
+                  if (Platform.OS === 'android') {
+                    setShowTimePicker(false);
+                  }
+                  if (selectedTime) {
+                    // Preserve the date when changing time
+                    const newDate = new Date(eventDate);
+                    newDate.setHours(selectedTime.getHours());
+                    newDate.setMinutes(selectedTime.getMinutes());
+                    setEventDate(newDate);
+                    if (Platform.OS === 'ios') {
+                      // On iOS, keep picker open but user can dismiss manually
+                    }
+                  } else if (Platform.OS === 'android') {
+                    // User cancelled on Android
+                    setShowTimePicker(false);
+                  }
+                }}
+              />
+            )}
+            
+            {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
+              <View style={styles.iosPickerActions}>
+                <TouchableOpacity
+                  style={styles.iosPickerButton}
+                  onPress={() => {
+                    setShowDatePicker(false);
+                    setShowTimePicker(false);
+                  }}
+                >
+                  <Text style={styles.iosPickerButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
             <Text style={styles.label}>Location *</Text>
             <TextInput
               style={styles.input}
@@ -249,6 +380,36 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
             />
             {locationError && (
               <Text style={styles.errorTextSmall}>{locationError}</Text>
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Event Image (Optional)</Text>
+            {selectedImage ? (
+              <View style={styles.imagePreviewContainer}>
+                <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
+                <TouchableOpacity
+                  style={styles.removeImageButton}
+                  onPress={handleRemoveImage}
+                >
+                  <Ionicons name="close-circle" size={24} color="#DC2626" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.imagePickerButton}
+                onPress={handlePickImage}
+                disabled={uploadingImage}
+              >
+                {uploadingImage ? (
+                  <ActivityIndicator color="#1D4ED8" />
+                ) : (
+                  <>
+                    <Ionicons name="image-outline" size={20} color="#1D4ED8" />
+                    <Text style={styles.imagePickerText}>Select Image</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
           </View>
 
@@ -306,6 +467,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   textArea: { height: 120, textAlignVertical: 'top' },
+  dateTimeContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dateTimeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    borderColor: '#D6E4FF',
+    borderWidth: 1,
+    gap: 8,
+  },
+  dateTimeText: {
+    fontSize: 14,
+    color: '#111827',
+    fontWeight: '500',
+  },
+  iosPickerActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingTop: 8,
+  },
+  iosPickerButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  iosPickerButtonText: {
+    color: '#1D4ED8',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   clubSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   clubOption: {
     padding: 10,
@@ -331,4 +526,40 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#DC2626' },
   errorTextSmall: { color: 'red', fontSize: 12 },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    borderColor: '#D6E4FF',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    gap: 8,
+  },
+  imagePickerText: {
+    color: '#1D4ED8',
+    fontWeight: '500',
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D6E4FF',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 4,
+  },
 });

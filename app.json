@@ -28,7 +28,13 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos to upload event images."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

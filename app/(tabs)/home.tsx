@@ -52,7 +52,7 @@ export default function HomeScreen() {
           category: "Club Event",
           attendees: 0,
           maxAttendees: undefined,
-          imageUrl: undefined,
+          imageUrl: event.imageUrl,
           isUserAttending: false,
           likes: 0,
           liked: false,
