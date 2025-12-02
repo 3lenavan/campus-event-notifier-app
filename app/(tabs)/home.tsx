@@ -196,6 +196,15 @@ export default function HomeScreen() {
     loadApproved().finally(() => setRefreshing(false));
   }, [loadApproved]);
 
+  const getUserGreeting = () => {
+    if (!profile?.name && !user?.displayName) {
+      return "Hello";
+    }
+    const name = profile?.name || user?.displayName || "";
+    const firstName = name.split(" ")[0];
+    return `Hello, ${firstName}`;
+  };
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -204,52 +213,98 @@ export default function HomeScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        renderItem={({ item }) => (
-          <View style={styles.postCard}>
-            {/* Simulated header with club name to resemble Instagram-like feed */}
-            <View style={styles.postHeader}>
-              <View style={styles.clubAvatar} />
-              <View style={{ marginLeft: 10 }}>
-                <Text style={styles.clubName}>{item.club.name}</Text>
-                <Text style={styles.postSubtle}>{item.location}</Text>
-              </View>
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.headerTitle}>{getUserGreeting()}</Text>
+              <Text style={styles.headerSubtitle}>Welcome to Campus Events</Text>
             </View>
-
-            <EventCard
-              event={item}
-              onPress={onPressEvent}
-              onRSVP={toggleRSVP}
-              onLike={toggleLike}
-              onFavorite={toggleFavorite}
-              liked={item.liked}
-              favorited={item.favorited}
-              likesCount={item.likes}
-            />
+            {user && (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {(profile?.name || user?.displayName || user?.email || "?")[0].toUpperCase()}
+                </Text>
+              </View>
+            )}
           </View>
+        }
+        renderItem={({ item }) => (
+          <EventCard
+            event={item}
+            onPress={onPressEvent}
+            onRSVP={toggleRSVP}
+            onLike={toggleLike}
+            onFavorite={toggleFavorite}
+            liked={item.liked}
+            favorited={item.favorited}
+            likesCount={item.likes}
+          />
         )}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No events available</Text>
+            <Text style={styles.emptySubtext}>Check back later for new events</Text>
+          </View>
+        }
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F3F4F6" },
-  listContent: { padding: 12, paddingBottom: 40 },
-  postCard: {
-    backgroundColor: "transparent",
-  },
-  postHeader: {
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  listContent: { paddingHorizontal: 20, paddingBottom: 120 },
+  header: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    paddingTop: 8,
+    paddingBottom: 24,
+    paddingHorizontal: 0,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#111827",
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: "#6B7280",
+    fontWeight: "400",
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#3B82F6",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 80,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#374151",
     marginBottom: 8,
-    paddingHorizontal: 2,
   },
-  clubAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FACC15",
+  emptySubtext: {
+    fontSize: 14,
+    color: "#9CA3AF",
   },
-  clubName: { fontSize: 14, fontWeight: "600", color: "#111827" },
-  postSubtle: { fontSize: 12, color: "#6B7280" },
 });

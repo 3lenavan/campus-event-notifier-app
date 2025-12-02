@@ -82,23 +82,35 @@ export default function Discover() {
       <View style={styles.searchContainer}>
         <Ionicons
           name="search-outline"
-          size={18}
-          color="#6B7280"
+          size={20}
+          color="#9CA3AF"
           style={styles.searchIcon}
         />
         <TextInput
           style={styles.input}
-          placeholder="Search clubs..."
+          placeholder="Search clubs, categories..."
           placeholderTextColor="#9CA3AF"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setSearchQuery("")}
+            style={styles.clearButton}
+          >
+            <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Club List */}
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {filteredClubs.length === 0 ? (
           <View style={styles.emptyState}>
+            <Ionicons name="search-outline" size={48} color="#D1D5DB" />
             <Text style={styles.emptyText}>No clubs found</Text>
             <Text style={styles.emptySubText}>Try a different search term</Text>
           </View>
@@ -106,7 +118,7 @@ export default function Discover() {
           filteredClubs.map((club) => (
             <TouchableOpacity
               key={club.id}
-              activeOpacity={0.85}
+              activeOpacity={0.9}
               style={styles.clubCard}
               onPress={() =>
                 router.push({
@@ -115,26 +127,18 @@ export default function Discover() {
                 })
               }
             >
-              <Image
-                source={{
-                  uri:
-                    club.imageUrl && club.imageUrl.startsWith("http")
-                      ? club.imageUrl
-                      : "https://via.placeholder.com/300x150.png?text=Club+Image",
-                }}
-                style={styles.clubImage}
-                resizeMode="cover"
-              />
-
-              <View style={styles.clubInfo}>
-                <Text style={styles.clubName}>{club.name}</Text>
-                <Text style={styles.clubDescription}>
-                  {club.description && club.description.length > 80
-                    ? club.description.substring(0, 80) + "..."
-                    : club.description || "No description available"}
-                </Text>
-
-                <View style={styles.badgeRow}>
+              <View style={styles.imageContainer}>
+                <Image
+                  source={{
+                    uri:
+                      club.imageUrl && club.imageUrl.startsWith("http")
+                        ? club.imageUrl
+                        : "https://via.placeholder.com/400x200.png?text=Club+Image",
+                  }}
+                  style={styles.clubImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.imageOverlay}>
                   <View
                     style={[
                       styles.categoryBadge,
@@ -143,10 +147,25 @@ export default function Discover() {
                   >
                     <Text style={styles.categoryText}>{club.category}</Text>
                   </View>
-                  <Text style={styles.eventCount}>
-                    {getEventCount(club)} upcoming event
-                    {getEventCount(club) !== 1 ? "s" : ""}
-                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.clubInfo}>
+                <Text style={styles.clubName} numberOfLines={2}>
+                  {club.name}
+                </Text>
+                <Text style={styles.clubDescription} numberOfLines={2}>
+                  {club.description || "No description available"}
+                </Text>
+
+                <View style={styles.footerRow}>
+                  <View style={styles.eventInfo}>
+                    <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+                    <Text style={styles.eventCount}>
+                      {getEventCount(club)} event{getEventCount(club) !== 1 ? "s" : ""}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
                 </View>
               </View>
             </TouchableOpacity>
@@ -159,72 +178,157 @@ export default function Discover() {
 
 // Styles
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB" },
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
+    paddingTop: 8,
+    paddingBottom: 12,
+    paddingHorizontal: 20,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 0.5,
+    borderColor: "#F3F4F6",
   },
-  headerTitle: { fontSize: 22, fontWeight: "bold", color: "#111827" },
-  headerSubtitle: { fontSize: 13, color: "#6B7280" },
+  headerTitle: { 
+    fontSize: 28, 
+    fontWeight: "700", 
+    color: "#111827",
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: { 
+    fontSize: 14, 
+    color: "#6B7280",
+    marginTop: 2,
+  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 8,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: "#D1D5DB",
+    backgroundColor: "#F9FAFB",
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-    paddingHorizontal: 10,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   input: {
     flex: 1,
-    height: 40,
-    fontSize: 14,
+    fontSize: 15,
     color: "#111827",
     paddingLeft: 8,
+    paddingVertical: 0,
   },
-  searchIcon: { marginRight: 4 },
-  scrollContent: { padding: 16, paddingBottom: 120 },
-  emptyState: { alignItems: "center", marginTop: 60 },
-  emptyText: { color: "#6B7280", fontSize: 15 },
-  emptySubText: { fontSize: 12, color: "#9CA3AF", marginTop: 4 },
+  searchIcon: { marginRight: 8 },
+  clearButton: {
+    marginLeft: 8,
+    padding: 2,
+  },
+  scrollContent: { 
+    paddingHorizontal: 20, 
+    paddingBottom: 120,
+  },
+  emptyState: { 
+    alignItems: "center", 
+    marginTop: 80,
+    paddingVertical: 40,
+  },
+  emptyText: { 
+    color: "#374151", 
+    fontSize: 16,
+    fontWeight: "500",
+    marginTop: 16,
+  },
+  emptySubText: { 
+    fontSize: 14, 
+    color: "#9CA3AF", 
+    marginTop: 8,
+  },
   clubCard: {
-    backgroundColor: "white",
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    marginBottom: 20,
+    marginBottom: 24,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    borderWidth: 0.5,
+    borderColor: "#F3F4F6",
   },
-  clubImage: { width: "100%", height: 140 },
-  clubInfo: { padding: 12 },
-  clubName: { fontWeight: "700", fontSize: 17, color: "#111827" },
+  imageContainer: {
+    position: "relative",
+    width: "100%",
+    height: 200,
+  },
+  clubImage: { 
+    width: "100%", 
+    height: "100%",
+  },
+  imageOverlay: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    justifyContent: "flex-start",
+  },
+  clubInfo: { 
+    padding: 16,
+  },
+  clubName: { 
+    fontWeight: "700", 
+    fontSize: 20, 
+    color: "#111827",
+    lineHeight: 26,
+    marginBottom: 8,
+    letterSpacing: -0.3,
+  },
   clubDescription: {
-    color: "#4B5563",
-    fontSize: 13,
+    color: "#6B7280",
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginTop: 4,
-    lineHeight: 18,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
   },
-  badgeRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
+  eventInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   categoryBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  categoryText: { color: "white", fontSize: 11, fontWeight: "600" },
-  eventCount: { fontSize: 12, color: "#6B7280", marginLeft: 8 },
+  categoryText: { 
+    color: "#FFFFFF", 
+    fontSize: 12, 
+    fontWeight: "600",
+    letterSpacing: 0.2,
+  },
+  eventCount: { 
+    fontSize: 13, 
+    color: "#6B7280",
+    fontWeight: "500",
+  },
 });
