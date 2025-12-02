@@ -1,18 +1,17 @@
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
-import { supabase } from '../../data/supabaseClient';
-import { Alert, Platform } from 'react-native';
+import * as ImagePicker from "expo-image-picker";
+import { Alert, Platform } from "react-native";
+import { supabase } from "../../data/supabaseClient";
 
 /**
- * Request permissions for image picker
+ * Request permission
  */
 export const requestImagePermissions = async (): Promise<boolean> => {
-  if (Platform.OS !== 'web') {
+  if (Platform.OS !== "web") {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
+    if (status !== "granted") {
       Alert.alert(
-        'Permission Required',
-        'Sorry, we need camera roll permissions to upload images!'
+        "Permission Required",
+        "Sorry, we need camera roll permissions to upload images."
       );
       return false;
     }
@@ -21,13 +20,11 @@ export const requestImagePermissions = async (): Promise<boolean> => {
 };
 
 /**
- * Pick an image from the device
+ * Pick image (uri + base64)
  */
-export const pickImage = async (): Promise<string | null> => {
+export const pickImage = async (): Promise<{ uri: string; base64: string } | null> => {
   const hasPermission = await requestImagePermissions();
-  if (!hasPermission) {
-    return null;
-  }
+  if (!hasPermission) return null;
 
   try {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -35,108 +32,83 @@ export const pickImage = async (): Promise<string | null> => {
       allowsEditing: true,
       aspect: [16, 9],
       quality: 0.8,
-      allowsMultipleSelection: false,
+      base64: true,
     });
 
-    if (result.canceled || !result.assets || result.assets.length === 0) {
-      return null;
-    }
+    if (result.canceled || !result.assets?.length) return null;
 
-    // On web, the URI might be a blob URL or data URI
-    // On mobile, it's a file URI
-    return result.assets[0].uri;
-  } catch (error) {
-    console.error('Error picking image:', error);
-    Alert.alert('Error', 'Failed to pick image. Please try again.');
+    const asset = result.assets[0];
+
+    return {
+      uri: asset.uri,
+      base64: asset.base64 || "",
+    };
+  } catch (err) {
+    console.error("Error picking image:", err);
+    Alert.alert("Error", "Failed to pick image.");
     return null;
   }
 };
 
 /**
- * Upload image to Supabase Storage
+ * Upload base64 → Supabase
  */
 export const uploadEventImage = async (
-  imageUri: string,
+  uri: string,
+  base64: string,
   userId: string,
   eventId?: string
 ): Promise<string | null> => {
   try {
-    // Generate unique filename
     const timestamp = Date.now();
-    const randomId = Math.random().toString(36).substring(2, 9);
-    const filename = eventId 
+    const rand = Math.random().toString(36).substring(2, 8);
+
+    const filename = eventId
       ? `event-${eventId}-${timestamp}.jpg`
-      : `event-${timestamp}-${randomId}.jpg`;
-    const filePath = `event-images/${userId}/${filename}`;
+      : `event-${timestamp}-${rand}.jpg`;
 
-    // Read the file
-    // Handle both file:// URIs (mobile) and blob/data URIs (web)
-    let blob: Blob;
-    if (Platform.OS === 'web') {
-      // On web, fetch should work with blob/data URIs
-      const response = await fetch(imageUri);
-      blob = await response.blob();
-    } else {
-      // On mobile, use FileSystem to read the file
-      const base64 = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      // Convert base64 to blob
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      blob = new Blob([byteArray], { type: 'image/jpeg' });
-    }
+    const filePath = `${userId}/${filename}`;
 
-    // Upload to Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('event-images')
-      .upload(filePath, blob, {
-        contentType: 'image/jpeg',
+    // Convert base64 → data URL (Supabase requires this)
+    const base64DataUrl = `data:image/jpeg;base64,${base64}`;
+
+    const { error } = await supabase.storage
+      .from("event-images")
+      .upload(filePath, base64DataUrl, {
+        contentType: "image/jpeg",
         upsert: false,
       });
 
     if (error) {
-      console.error('Error uploading image:', error);
+      console.error("Error uploading image:", error);
       throw error;
     }
 
     // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('event-images')
+    const { data } = supabase.storage
+      .from("event-images")
       .getPublicUrl(filePath);
 
-    return urlData.publicUrl;
-  } catch (error: any) {
-    console.error('Error uploading image to Supabase:', error);
-    Alert.alert('Upload Error', error.message || 'Failed to upload image. Please try again.');
+    return data.publicUrl;
+  } catch (err: any) {
+    console.error("Upload error:", err);
+    Alert.alert("Upload Error", err.message || "Failed to upload image.");
     return null;
   }
 };
 
 /**
- * Delete an image from Supabase Storage
+ * Delete image
  */
 export const deleteEventImage = async (imageUrl: string): Promise<void> => {
   try {
-    // Extract file path from URL
-    const urlParts = imageUrl.split('/');
-    const filePath = urlParts.slice(urlParts.indexOf('event-images')).join('/');
+    if (!imageUrl.includes("event-images")) return;
 
-    const { error } = await supabase.storage
-      .from('event-images')
-      .remove([filePath]);
+    // Extract actual path: userId/file.jpg
+    const filePath = imageUrl.split("/event-images/")[1];
 
-    if (error) {
-      console.error('Error deleting image:', error);
-      // Don't throw - deletion is not critical
-    }
-  } catch (error) {
-    console.error('Error deleting image:', error);
-    // Don't throw - deletion is not critical
+    await supabase.storage.from("event-images").remove([filePath]);
+  } catch (err) {
+    console.error("Error deleting image:", err);
   }
 };
-

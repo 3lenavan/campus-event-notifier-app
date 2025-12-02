@@ -8,6 +8,7 @@ import { listClubs } from "../../src/services/clubsService";
 import { getEventsInteractions, toggleFavorite as toggleFavoriteService, toggleLike as toggleLikeService } from "../../src/services/interactionsService";
 import EventCard, { Event as BaseEvent } from "../event-card";
 
+
 type FeedEvent = BaseEvent & {
   likes: number;
   liked: boolean;

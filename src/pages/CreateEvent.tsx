@@ -15,13 +15,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import { useAuthUser } from '../hooks/useAuthUser';
-import { getDefaultDenylist, validateEventInput } from '../lib/eventValidators';
 import { listClubs } from '../services/clubsService';
-import { notifyNow } from '../lib/notifications';
 import { createEvent } from '../services/eventsService';
 import { supabase } from "../../data/supabaseClient";
 import { Club } from '../types';
+
+// Updated import to use rewritten image picker and uploader
 import { pickImage, uploadEventImage } from '../services/imageUploadService';
 
 interface CreateEventProps {
@@ -30,7 +31,7 @@ interface CreateEventProps {
 
 export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   const router = useRouter();
-  const { user, profile } = useAuthUser();
+  const { user } = useAuthUser();
 
   const [clubs, setClubs] = useState<Club[]>([]);
   const [userClubIds, setUserClubIds] = useState<string[]>([]);
@@ -45,10 +46,12 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  // Updated image states: store both URI and Base64
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Load clubs
   useEffect(() => {
     loadClubs();
   }, []);
@@ -58,7 +61,6 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     setClubs(data || []);
   };
 
-  // Load user’s verified clubs from clubs_users
   const loadUserClubs = async () => {
     if (!user) return;
 
@@ -75,7 +77,6 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     setUserClubIds(data.map((row: any) => String(row.club_id)));
   };
 
-  // Refresh user clubs when screen is opened
   useFocusEffect(
     useCallback(() => {
       if (user) {
@@ -84,12 +85,11 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     }, [user])
   );
 
-  // Preselect club if none selected
   useEffect(() => {
-  if (userClubIds.length > 0 && !selectedClubId) {
-    setSelectedClubId(String(userClubIds[0]));   // <-- FIX
-  }
-}, [userClubIds]);
+    if (userClubIds.length > 0 && !selectedClubId) {
+      setSelectedClubId(String(userClubIds[0]));
+    }
+  }, [userClubIds]);
 
   const pickerColor = '#000000';
 
@@ -111,15 +111,19 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     }
   };
 
+  // Updated: Pick image using new picker that returns { uri, base64 }
   const handlePickImage = async () => {
-    const imageUri = await pickImage();
-    if (imageUri) {
-      setSelectedImage(imageUri);
+    const result = await pickImage();
+    if (result) {
+      setSelectedImageUri(result.uri);
+      setSelectedImageBase64(result.base64);
     }
   };
 
+  // Updated: Remove image clears both values
   const handleRemoveImage = () => {
-    setSelectedImage(null);
+    setSelectedImageUri(null);
+    setSelectedImageBase64(null);
   };
 
   const handleCreateEvent = async () => {
@@ -147,21 +151,27 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     setLoading(true);
     let imageUrl: string | undefined = undefined;
 
-    try {
-      // Upload image first if one is selected
-      if (selectedImage) {
-        setUploadingImage(true);
-        const uploadedUrl = await uploadEventImage(selectedImage, user.uid);
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-        } else {
-          Alert.alert('Warning', 'Failed to upload image. Event will be created without image.');
-        }
-        setUploadingImage(false);
+    // Updated image upload logic using new uploadEventImage
+    if (selectedImageUri && selectedImageBase64) {
+      setUploadingImage(true);
+
+      const uploadedUrl = await uploadEventImage(
+        selectedImageUri,
+        selectedImageBase64,
+        user.uid
+      );
+
+      if (uploadedUrl) {
+        imageUrl = uploadedUrl;
+      } else {
+        Alert.alert("Warning", "Failed to upload image. Event will be created without image.");
       }
 
-      // Create event with image URL
-      const newEvent = await createEvent(
+      setUploadingImage(false);
+    }
+
+    try {
+      await createEvent(
         {
           title: title.trim(),
           description: description.trim(),
@@ -224,6 +234,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
         <View style={styles.content}>
           <Text style={styles.title}>Create Event</Text>
 
+          {/* Club selection */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Select Club *</Text>
             <View style={styles.clubSelector}>
@@ -249,6 +260,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
             </View>
           </View>
 
+          {/* Event Title */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Event Title *</Text>
             <TextInput
@@ -259,6 +271,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
             />
           </View>
 
+          {/* Description */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Description *</Text>
             <TextInput
@@ -270,6 +283,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
             />
           </View>
 
+          {/* Date and time pickers */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Date & Time *</Text>
             <View style={styles.dateTimeContainer}>
@@ -301,7 +315,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
                 </Text>
               </TouchableOpacity>
             </View>
-            
+
             {showDatePicker && (
               <DateTimePicker
                 value={eventDate}
@@ -312,23 +326,18 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
                     setShowDatePicker(false);
                   }
                   if (selectedDate) {
-                    // Preserve the time when changing date
                     const newDate = new Date(selectedDate);
                     newDate.setHours(eventDate.getHours());
                     newDate.setMinutes(eventDate.getMinutes());
                     setEventDate(newDate);
-                    if (Platform.OS === 'ios') {
-                      // On iOS, keep picker open but user can dismiss manually
-                    }
                   } else if (Platform.OS === 'android') {
-                    // User cancelled on Android
                     setShowDatePicker(false);
                   }
                 }}
                 minimumDate={new Date()}
               />
             )}
-            
+
             {showTimePicker && (
               <DateTimePicker
                 value={eventDate}
@@ -339,22 +348,17 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
                     setShowTimePicker(false);
                   }
                   if (selectedTime) {
-                    // Preserve the date when changing time
                     const newDate = new Date(eventDate);
                     newDate.setHours(selectedTime.getHours());
                     newDate.setMinutes(selectedTime.getMinutes());
                     setEventDate(newDate);
-                    if (Platform.OS === 'ios') {
-                      // On iOS, keep picker open but user can dismiss manually
-                    }
                   } else if (Platform.OS === 'android') {
-                    // User cancelled on Android
                     setShowTimePicker(false);
                   }
                 }}
               />
             )}
-            
+
             {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
               <View style={styles.iosPickerActions}>
                 <TouchableOpacity
@@ -370,6 +374,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
             )}
           </View>
 
+          {/* Location */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Location *</Text>
             <TextInput
@@ -383,11 +388,16 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
             )}
           </View>
 
+          {/* Image Picker Section (Updated) */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Event Image (Optional)</Text>
-            {selectedImage ? (
+
+            {selectedImageUri ? (
               <View style={styles.imagePreviewContainer}>
-                <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
+                <Image
+                  source={{ uri: selectedImageUri }}
+                  style={styles.imagePreview}
+                />
                 <TouchableOpacity
                   style={styles.removeImageButton}
                   onPress={handleRemoveImage}
@@ -413,6 +423,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
             )}
           </View>
 
+          {/* Validation errors */}
           {validationErrors.length > 0 && (
             <View style={styles.errorContainer}>
               {validationErrors.map((error, idx) => (
@@ -423,6 +434,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
             </View>
           )}
 
+          {/* Submit Button */}
           <TouchableOpacity
             style={[styles.createButton, loading && styles.buttonDisabled]}
             onPress={handleCreateEvent}
