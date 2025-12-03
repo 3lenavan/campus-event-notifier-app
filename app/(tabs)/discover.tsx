@@ -11,11 +11,13 @@ import {
   View,
 } from "react-native";
 import { getClubs, Club } from "../../data/dataLoader";
+import { getClubEventCount } from "../../src/services/eventsService";
 
 export default function Discover() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [clubs, setClubs] = useState<Club[]>([]);
+  const [eventCounts, setEventCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   // Load club data from Supabase when screen mounts
@@ -24,6 +26,18 @@ export default function Discover() {
       try {
         const data = await getClubs(); // fetch from Supabase
         setClubs(data || []);
+        
+        // Fetch real-time event counts for each club
+        const counts: Record<string, number> = {};
+        if (data && data.length > 0) {
+          await Promise.all(
+            data.map(async (club) => {
+              const count = await getClubEventCount(club.id);
+              counts[String(club.id)] = count;
+            })
+          );
+        }
+        setEventCounts(counts);
       } catch (error) {
         console.error("Error loading clubs:", error);
       } finally {
@@ -45,7 +59,14 @@ export default function Discover() {
     );
   });
 
-  const getEventCount = (club: Club) => Array.isArray(club.events) ? club.events.length : 0;
+  const getEventCount = (club: Club) => {
+    // Use real-time count from state, fallback to club.events if available
+    const realTimeCount = eventCounts[String(club.id)];
+    if (realTimeCount !== undefined) {
+      return realTimeCount;
+    }
+    return Array.isArray(club.events) ? club.events.length : 0;
+  };
 
 
   const getCategoryColor = (category: string) => {
