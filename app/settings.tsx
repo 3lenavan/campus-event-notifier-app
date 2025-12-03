@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
+import { Stack } from "expo-router";
 import {
     SafeAreaView,
     StyleSheet,
@@ -12,33 +13,13 @@ import {
 import { useAuthUser } from "../src/hooks/useAuthUser";
 
 export default function Settings() {
-  const [darkMode, setDarkMode] = useState(false);
   const { profile } = useAuthUser();
-
-  const toggleDarkMode = () => setDarkMode(!darkMode);
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Back Button */}
-      <TouchableOpacity
-        style={styles.backButton}
-        activeOpacity={0.8}
-        onPress={() => router.back()}
-      >
-        <Ionicons name="arrow-back" size={22} color="#111827" />
-        <Text style={styles.backText}>Back</Text>
-      </TouchableOpacity>
 
       {/* Header */}
       <Text style={styles.header}>Settings</Text>
-
-      {/* Dark Mode Toggle */}
-      <View style={[styles.card, styles.cardSpacing]}>
-        <View style={styles.row}>
-          <Text style={styles.title}>Dark Mode</Text>
-          <Switch value={darkMode} onValueChange={toggleDarkMode} />
-        </View>
-      </View>
 
       {/* Update Email */}
       <TouchableOpacity
@@ -75,28 +56,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#f9fafb",
-    paddingTop: 50,
-  },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    marginBottom: 16,
-    marginLeft: 16, // gives space from the edge
-  },
-  backText: {
-    fontSize: 16,
-    marginLeft: 6,
-    color: "#111827",
-    fontWeight: "500",
+    paddingTop: 15,
   },
   header: {
     fontSize: 22,
