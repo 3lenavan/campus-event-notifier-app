@@ -40,13 +40,27 @@ export const getEventPolicy = async (): Promise<EventPolicy> => {
       .maybeSingle();
 
     if (error) {
-      console.error('Error getting event policy from Supabase:', error);
+      // If it's a permission/authorization error (RLS or 401), silently use default policy
+      // This is expected if RLS policies aren't set up yet or user is not authenticated
+      if (error.code === '42501' || error.code === 'PGRST301' || error.status === 401 || error.message?.includes('401')) {
+        // Silently use default policy - this is expected behavior
+        return DEFAULT_POLICY;
+      }
+      // For other errors, log but still return default
+      console.warn('Error getting event policy from Supabase:', error.message);
       return DEFAULT_POLICY;
     }
 
     if (!data) {
-      // If no policy exists, create default one
-      await setEventPolicy(DEFAULT_POLICY);
+      // If no policy exists, try to create default one (may fail due to RLS)
+      try {
+        await setEventPolicy(DEFAULT_POLICY);
+      } catch (createError: any) {
+        // If creation fails (likely due to RLS), that's okay - we'll use the default
+        if (createError.code !== '42501') {
+          console.warn('Could not create default event policy:', createError.message);
+        }
+      }
       return DEFAULT_POLICY;
     }
 
@@ -96,10 +110,20 @@ export const setEventPolicy = async (policy: EventPolicy): Promise<void> => {
       });
 
     if (error) {
+      // If it's a permission/authorization error, don't throw - just log
+      if (error.code === '42501' || error.code === 'PGRST301' || error.status === 401) {
+        console.log('Cannot set event policy (RLS/Unauthorized), using default policy');
+        return; // Silently fail - default policy will be used
+      }
       console.error('Error setting event policy in Supabase:', error);
       throw error;
     }
-  } catch (error) {
+  } catch (error: any) {
+    // If it's a permission/authorization error, don't throw
+    if (error?.code === '42501' || error?.code === 'PGRST301' || error?.status === 401) {
+      console.log('Cannot set event policy (RLS/Unauthorized), using default policy');
+      return; // Silently fail - default policy will be used
+    }
     console.error('Error setting event policy:', error);
     throw error;
   }

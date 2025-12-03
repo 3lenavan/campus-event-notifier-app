@@ -65,6 +65,7 @@ export const listApprovedEvents = async (): Promise<Event[]> => {
       createdAt: new Date(row.created_at).getTime(),
       status: row.status || 'approved',
       moderationNote: row.moderation_note || undefined,
+      imageUrl: row.image_url || undefined,
     }));
   } catch (error) {
     console.error('Error listing approved events:', error);

@@ -59,6 +59,11 @@ export default function EventCard({
               "https://via.placeholder.com/400x300.png?text=Event+Image",
           }}
           style={styles.image}
+          resizeMode="cover"
+          onError={(error) => {
+            console.log("Image load error:", error.nativeEvent.error);
+            console.log("Image URL:", event.imageUrl);
+          }}
         />
       </View>
 

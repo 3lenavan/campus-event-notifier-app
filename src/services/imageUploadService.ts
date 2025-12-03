@@ -28,7 +28,7 @@ export const pickImage = async (): Promise<{ uri: string; base64: string } | nul
 
   try {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [16, 9],
       quality: 0.8,
@@ -51,7 +51,8 @@ export const pickImage = async (): Promise<{ uri: string; base64: string } | nul
 };
 
 /**
- * Upload base64 → Supabase
+ * Upload image to Supabase Storage
+ * Works on web, iOS, and Android
  */
 export const uploadEventImage = async (
   uri: string,
@@ -69,12 +70,44 @@ export const uploadEventImage = async (
 
     const filePath = `${userId}/${filename}`;
 
-    // Convert base64 → data URL (Supabase requires this)
-    const base64DataUrl = `data:image/jpeg;base64,${base64}`;
+    let fileData: Blob | Uint8Array | File;
+
+    if (Platform.OS === 'web') {
+      // On web, convert base64 to Blob
+      if (base64) {
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        fileData = new Blob([byteArray], { type: 'image/jpeg' });
+      } else {
+        // Fallback: fetch from URI
+        const response = await fetch(uri);
+        fileData = await response.blob();
+      }
+    } else {
+      // On mobile (iOS/Android), convert base64 to Uint8Array
+      if (base64) {
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        fileData = new Uint8Array(byteNumbers);
+      } else {
+        // Fallback: fetch from URI and convert to Uint8Array
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        fileData = new Uint8Array(arrayBuffer);
+      }
+    }
 
     const { error } = await supabase.storage
       .from("event-images")
-      .upload(filePath, base64DataUrl, {
+      .upload(filePath, fileData, {
         contentType: "image/jpeg",
         upsert: false,
       });
@@ -104,8 +137,11 @@ export const deleteEventImage = async (imageUrl: string): Promise<void> => {
   try {
     if (!imageUrl.includes("event-images")) return;
 
-    // Extract actual path: userId/file.jpg
-    const filePath = imageUrl.split("/event-images/")[1];
+    // Extract actual path: event-images/userId/file.jpg
+    const urlParts = imageUrl.split("/event-images/");
+    if (urlParts.length < 2) return;
+    
+    const filePath = `event-images/${urlParts[1]}`;
 
     await supabase.storage.from("event-images").remove([filePath]);
   } catch (err) {

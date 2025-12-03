@@ -3,23 +3,23 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
+import { supabase } from "../../data/supabaseClient";
 import { useAuthUser } from '../hooks/useAuthUser';
 import { listClubs } from '../services/clubsService';
 import { createEvent } from '../services/eventsService';
-import { supabase } from "../../data/supabaseClient";
 import { Club } from '../types';
 
 // Updated import to use rewritten image picker and uploader
@@ -397,6 +397,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
                 <Image
                   source={{ uri: selectedImageUri }}
                   style={styles.imagePreview}
+                  resizeMode="cover"
                 />
                 <TouchableOpacity
                   style={styles.removeImageButton}
@@ -564,7 +565,6 @@ const styles = StyleSheet.create({
   imagePreview: {
     width: '100%',
     height: 200,
-    resizeMode: 'cover',
   },
   removeImageButton: {
     position: 'absolute',
