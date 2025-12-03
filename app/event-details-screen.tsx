@@ -25,6 +25,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Club, getClubByIdSupabase } from "../data/dataLoader";
 import { auth, db } from "../src/lib/firebase";
 import { notifyRSVPConfirmation } from "../src/lib/notifications";
 import { listApprovedEvents } from "../src/services/eventsService";
@@ -63,6 +64,7 @@ export default function EventDetails() {
   const [liked, setLiked] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [club, setClub] = useState<Club | null>(null);
 
   // Track logged-in user
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -98,6 +100,16 @@ export default function EventDetails() {
             fullDescription: foundEvent.description,
           };
           setEvent(eventData);
+          
+          // Fetch club information
+          if (foundEvent.clubId) {
+            try {
+              const clubData = await getClubByIdSupabase(Number(foundEvent.clubId));
+              setClub(clubData);
+            } catch (error) {
+              console.error("Error fetching club:", error);
+            }
+          }
         } else {
           // Fallback to Firestore if not found in local storage
           const docRef = doc(db, "events", id as string);
@@ -520,6 +532,13 @@ export default function EventDetails() {
         <View style={styles.contentSection}>
           <Text style={styles.title}>{event.title}</Text>
           
+          {club && (
+            <View style={styles.clubRow}>
+              <Ionicons name="people" size={16} color="#3B82F6" />
+              <Text style={styles.clubText}>{club.name}</Text>
+            </View>
+          )}
+          
           <View style={styles.locationRow}>
             <Ionicons name="location" size={16} color="#10B981" />
             <Text style={styles.locationText}>{event.location}</Text>
@@ -685,6 +704,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     letterSpacing: -0.5,
     lineHeight: 38,
+  },
+  clubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 12,
+  },
+  clubText: {
+    fontSize: 15,
+    color: "#3B82F6",
+    fontWeight: "600",
   },
   locationRow: {
     flexDirection: "row",

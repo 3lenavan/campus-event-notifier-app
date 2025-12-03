@@ -74,7 +74,7 @@ export const listApprovedEvents = async (): Promise<Event[]> => {
 };
 
 /**
- * Get events for a specific club
+ * Get events for a specific club (only approved events)
  */
 export const listClubEvents = async (clubId: string): Promise<Event[]> => {
   try {
@@ -82,7 +82,8 @@ export const listClubEvents = async (clubId: string): Promise<Event[]> => {
       .from('events')
       .select('*')
       .eq('club_id', parseInt(clubId))
-      .order('created_at', { ascending: false });
+      .eq('status', 'approved')
+      .order('date_iso', { ascending: true });
 
     if (error) {
       console.error('Error listing club events from Supabase:', error);
@@ -106,6 +107,29 @@ export const listClubEvents = async (clubId: string): Promise<Event[]> => {
   } catch (error) {
     console.error('Error listing club events:', error);
     return [];
+  }
+};
+
+/**
+ * Get the count of approved events for a specific club
+ */
+export const getClubEventCount = async (clubId: string | number): Promise<number> => {
+  try {
+    const { count, error } = await supabase
+      .from('events')
+      .select('*', { count: 'exact', head: true })
+      .eq('club_id', typeof clubId === 'string' ? parseInt(clubId) : clubId)
+      .eq('status', 'approved');
+
+    if (error) {
+      console.error('Error getting club event count from Supabase:', error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (error) {
+    console.error('Error getting club event count:', error);
+    return 0;
   }
 };
 
