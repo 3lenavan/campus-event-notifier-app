@@ -40,27 +40,37 @@ export default function HomeScreen() {
       const approved = await listApprovedEvents();
       const clubs = await listClubs();
       
-      // Map events to FeedEvent format
-      const eventsMapped: FeedEvent[] = approved.map((event) => {
-        const date = new Date(event.dateISO);
-        return {
-          id: event.id,
-          title: event.title,
-          description: event.description,
-          date: date.toISOString(),
-          time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
-          location: event.location,
-          category: "Club Event",
-          attendees: 0,
-          maxAttendees: undefined,
-          imageUrl: event.imageUrl,
-          isUserAttending: false,
-          likes: 0,
-          liked: false,
-          favorited: false,
-          club: { id: event.clubId, name: clubs.find((c:any)=>c.id===event.clubId)?.name || "Unknown Club" },
-        };
-      }).sort((a,b)=> new Date(a.date).getTime() - new Date(b.date).getTime());
+      // Get current date/time to filter out past events
+      const now = new Date();
+      
+      // Map events to FeedEvent format and filter out past events
+      const eventsMapped: FeedEvent[] = approved
+        .filter((event) => {
+          // Only include events that haven't passed yet
+          const eventDate = new Date(event.dateISO);
+          return eventDate >= now;
+        })
+        .map((event) => {
+          const date = new Date(event.dateISO);
+          return {
+            id: event.id,
+            title: event.title,
+            description: event.description,
+            date: date.toISOString(),
+            time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+            location: event.location,
+            category: "Club Event",
+            attendees: 0,
+            maxAttendees: undefined,
+            imageUrl: event.imageUrl,
+            isUserAttending: false,
+            likes: 0,
+            liked: false,
+            favorited: false,
+            club: { id: event.clubId, name: clubs.find((c:any)=>c.id===event.clubId)?.name || "Unknown Club" },
+          };
+        })
+        .sort((a,b)=> new Date(a.date).getTime() - new Date(b.date).getTime());
 
       // Load likes and favorites if user is logged in
       if (user?.uid) {
