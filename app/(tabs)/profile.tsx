@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState, useCallback } from "react";
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
 import { auth } from "../../src/lib/firebase";
 import { listClubs } from "../../src/services/clubsService";
@@ -120,11 +121,11 @@ const Profile = () => {
   };
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
-    >
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView 
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Header */}
       <View style={styles.headerSection}>
         <Text style={styles.header}>Profile</Text>
@@ -301,7 +302,8 @@ const Profile = () => {
         <Ionicons name="log-out-outline" size={20} color="white" />
         <Text style={styles.buttonText}>Sign Out</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 

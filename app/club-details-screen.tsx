@@ -15,6 +15,7 @@ export default function ClubDetails() {
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
 
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -91,6 +92,47 @@ export default function ClubDetails() {
   const handleEventPress = (event: any) => {
     router.push({ pathname: "/event-details-screen", params: { id: event.id } });
   };
+
+  // Separate events into upcoming and past
+  const now = new Date();
+  now.setMilliseconds(0); // Normalize milliseconds for comparison
+  
+  const upcomingEvents = events.filter(event => {
+    if (!event.dateISO) return false;
+    try {
+      const eventDate = new Date(event.dateISO);
+      if (isNaN(eventDate.getTime())) return false; // Invalid date
+      return eventDate.getTime() >= now.getTime();
+    } catch (e) {
+      console.error('Error parsing event date:', event.dateISO, e);
+      return false;
+    }
+  });
+  
+  const pastEvents = events.filter(event => {
+    if (!event.dateISO) return false;
+    try {
+      const eventDate = new Date(event.dateISO);
+      if (isNaN(eventDate.getTime())) return false; // Invalid date
+      return eventDate.getTime() < now.getTime();
+    } catch (e) {
+      console.error('Error parsing event date:', event.dateISO, e);
+      return false;
+    }
+  }).reverse(); // Reverse to show most recent first
+  
+  // Debug: Log event counts
+  console.log('=== Event Filtering Debug ===');
+  console.log('Total events:', events.length);
+  console.log('Upcoming events:', upcomingEvents.length);
+  console.log('Past events:', pastEvents.length);
+  console.log('Current time:', now.toISOString());
+  if (events.length > 0) {
+    console.log('Sample event dateISO:', events[0].dateISO);
+    console.log('Sample event parsed date:', new Date(events[0].dateISO).toISOString());
+  }
+  
+  const displayedEvents = activeTab === 'upcoming' ? upcomingEvents : pastEvents;
 
   if (loading) {
     return (
@@ -174,8 +216,8 @@ export default function ClubDetails() {
 
             <View style={styles.ratingRow}>
               <Ionicons name="calendar" size={16} color="#3B82F6" />
-              <Text style={styles.ratingText}>{events.length}</Text>
-              <Text style={styles.reviewsText}>upcoming event{events.length !== 1 ? "s" : ""}</Text>
+              <Text style={styles.ratingText}>{upcomingEvents.length}</Text>
+              <Text style={styles.reviewsText}>upcoming event{upcomingEvents.length !== 1 ? "s" : ""}</Text>
             </View>
 
             <Text style={styles.description}>{club.description || "No description available."}</Text>
@@ -184,12 +226,40 @@ export default function ClubDetails() {
           {/* Events Section */}
           <View style={styles.eventsSection}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Upcoming Events</Text>
+              <Text style={styles.sectionTitle}>Events</Text>
             </View>
 
-            {events.length > 0 ? (
+            {/* Tabs - Always visible */}
+            <View style={styles.tabsContainer}>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'upcoming' && styles.tabActive]}
+                onPress={() => {
+                  console.log('Switching to upcoming tab');
+                  setActiveTab('upcoming');
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.tabText, activeTab === 'upcoming' && styles.tabTextActive]}>
+                  Upcoming ({upcomingEvents.length})
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'past' && styles.tabActive]}
+                onPress={() => {
+                  console.log('Switching to past tab, past events count:', pastEvents.length);
+                  setActiveTab('past');
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.tabText, activeTab === 'past' && styles.tabTextActive]}>
+                  Past ({pastEvents.length})
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {displayedEvents.length > 0 ? (
               <View style={styles.eventsList}>
-                {events.map((event) => (
+                {displayedEvents.map((event) => (
                   <TouchableOpacity
                     key={event.id}
                     style={styles.eventCard}
@@ -217,16 +287,22 @@ export default function ClubDetails() {
                         )}
                       </View>
 
-                      <TouchableOpacity
-                        style={styles.rsvpButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          handleEventPress(event);
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.rsvpButtonText}>RSVP</Text>
-                      </TouchableOpacity>
+                      {activeTab === 'upcoming' ? (
+                        <TouchableOpacity
+                          style={styles.rsvpButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleEventPress(event);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.rsvpButtonText}>RSVP</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={styles.pastEventBadge}>
+                          <Text style={styles.pastEventBadgeText}>Past Event</Text>
+                        </View>
+                      )}
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -234,8 +310,12 @@ export default function ClubDetails() {
             ) : (
               <View style={styles.emptyEvents}>
                 <Ionicons name="calendar-outline" size={48} color="#D1D5DB" />
-                <Text style={styles.emptyEventsText}>No upcoming events</Text>
-                <Text style={styles.emptyEventsSubtext}>Check back later for new events</Text>
+                <Text style={styles.emptyEventsText}>
+                  {activeTab === 'upcoming' ? 'No upcoming events' : 'No past events'}
+                </Text>
+                <Text style={styles.emptyEventsSubtext}>
+                  {activeTab === 'upcoming' ? 'Check back later for new events' : 'No past events to display'}
+                </Text>
               </View>
             )}
           </View>
@@ -385,6 +465,41 @@ const styles = StyleSheet.create({
     color: "#111827",
     letterSpacing: -0.3,
   },
+  tabsContainer: {
+    flexDirection: "row",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 10,
+    padding: 4,
+    marginBottom: 20,
+    minHeight: 50,
+    width: "100%",
+    zIndex: 1,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 42,
+  },
+  tabActive: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  tabTextActive: {
+    color: "#3B82F6",
+  },
   eventsList: {
     gap: 16,
   },
@@ -444,6 +559,19 @@ const styles = StyleSheet.create({
   },
   rsvpButtonText: {
     color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  pastEventBadge: {
+    backgroundColor: "#E5E7EB",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pastEventBadgeText: {
+    color: "#6B7280",
     fontSize: 16,
     fontWeight: "600",
   },

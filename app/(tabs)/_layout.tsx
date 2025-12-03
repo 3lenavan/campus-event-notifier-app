@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { Platform } from "react-native";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
 
 export default function Layout() {
@@ -15,8 +16,8 @@ export default function Layout() {
           backgroundColor: "#FFFFFF",
           borderTopWidth: 0.5,
           borderTopColor: "#F3F4F6",
-          height: 60,
-          paddingBottom: 8,
+          height: Platform.OS === 'ios' ? 85 : 60,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           paddingTop: 8,
           shadowColor: "#000",
           shadowOpacity: 0.05,

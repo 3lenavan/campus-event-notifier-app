@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 /**
@@ -25,6 +25,11 @@ export interface Event {
   liked?: boolean;
   favorited?: boolean;
   likes?: number;
+  club?: {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+  };
 }
 
 interface Props {
@@ -69,6 +74,14 @@ export default function EventCard({
 
       <View style={styles.cardContent}>
         <Text style={styles.title}>{event.title}</Text>
+        
+        {event.club && (
+          <View style={styles.clubRow}>
+            <Ionicons name="people" size={14} color="#3B82F6" />
+            <Text style={styles.clubText}>{event.club.name}</Text>
+          </View>
+        )}
+        
         <Text style={styles.locationText}>{event.location}</Text>
 
         <View style={styles.metaRow}>
@@ -97,6 +110,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 0.5,
     borderColor: "#F3F4F6",
+    width: "100%",
+    alignSelf: "stretch",
   },
   imageContainer: {
     width: "100%",
@@ -113,6 +128,18 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     color: "#111827",
+    marginBottom: 8,
+  },
+  clubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  clubText: {
+    fontSize: 14,
+    color: "#3B82F6",
+    fontWeight: "600",
   },
   locationText: {
     fontSize: 14,

@@ -2,6 +2,7 @@ import { router, useFocusEffect } from "expo-router";
 import { getAuth } from "firebase/auth";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
 import { listApprovedEvents } from "../../src/services/eventsService";
 import { listClubs } from "../../src/services/clubsService";
@@ -217,7 +218,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
@@ -258,13 +259,13 @@ export default function HomeScreen() {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-  listContent: { paddingHorizontal: 20, paddingBottom: 120 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 120, alignItems: 'stretch' },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

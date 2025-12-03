@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getClubs, Club } from "../../data/dataLoader";
 import { getClubEventCount } from "../../src/services/eventsService";
 
@@ -90,7 +91,7 @@ export default function Discover() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -193,7 +194,7 @@ export default function Discover() {
           ))
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -253,6 +254,7 @@ const styles = StyleSheet.create({
   scrollContent: { 
     paddingHorizontal: 20, 
     paddingBottom: 120,
+    alignItems: 'stretch',
   },
   emptyState: { 
     alignItems: "center", 
