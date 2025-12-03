@@ -196,7 +196,7 @@ export default function HomeScreen() {
           ? {
               ...e,
               isUserAttending: !e.isUserAttending,
-              attendees: e.attendees + (e.isUserAttending ? -1 : 1),
+              attendees: (e.attendees ?? 0) + (e.isUserAttending ? -1 : 1),
             }
           : e
       )

@@ -11,11 +11,17 @@ export interface Event {
   id: string;
   title: string;
   description: string;
-  date: string;
+
+  // Your original fields
+  date?: string;
   time: string;
+
+  // This is your ACTUAL date field from Supabase
+  dateISO?: string;
+
   location: string;
   category: string;
-  attendees: number;
+  attendees?: number;
   maxAttendees?: number;
   imageUrl?: string;
   isUserAttending?: boolean;
@@ -43,9 +49,16 @@ export function EventCard({
   likesCount,
   compact = false,
 }: EventCardProps) {
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", {
+
+  // ALWAYS USE dateISO when available
+  const getDisplayDate = () => {
+    const rawDate = event.dateISO || event.date;
+    if (!rawDate) return "No date";
+
+    const d = new Date(rawDate);
+    if (isNaN(d.getTime())) return "Invalid date";
+
+    return d.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",
@@ -93,7 +106,7 @@ export function EventCard({
               color="#6B7280"
               style={{ marginRight: 4 }}
             />
-            <Text style={styles.iconText}>{formatDate(event.date)}</Text>
+            <Text style={styles.iconText}>{getDisplayDate()}</Text>
           </View>
           <View style={styles.iconItem}>
             <Ionicons
@@ -187,7 +200,7 @@ export function EventCard({
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
             <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-            <Text style={styles.metaText}>{formatDate(event.date)}</Text>
+            <Text style={styles.metaText}>{getDisplayDate()}</Text>
           </View>
           <View style={styles.metaItem}>
             <Ionicons name="time-outline" size={16} color="#6B7280" />
