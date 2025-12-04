@@ -20,17 +20,22 @@ export default function ClubDetails() {
   const loadData = useCallback(async () => {
     if (!id) return;
     setLoading(true);
+
     const numericId = Number(id);
     const c = await getClubByIdSupabase(numericId);
     setClub(c);
     
     // Load events using the events service
     const clubEvents = await listClubEvents(id);
-    
+
+    // 🔍 DEBUG #1 — Raw events coming directly from Supabase
+    console.log("🔍 ClubDetails → RAW clubEvents from listClubEvents():", clubEvents);
+
     // Transform events for display
     const transformedEvents = clubEvents
       .map((event) => {
         const date = new Date(event.dateISO);
+
         return {
           id: event.id,
           title: event.title,
@@ -50,6 +55,9 @@ export default function ClubDetails() {
         };
       })
       .sort((a, b) => new Date(a.dateISO).getTime() - new Date(b.dateISO).getTime());
+
+    // 🔍 DEBUG #2 — After transform (formattedDate, etc.)
+    console.log("🔍 ClubDetails → TRANSFORMED events:", transformedEvents);
 
     // Load interactions if user is logged in
     if (user?.uid && transformedEvents.length > 0) {
@@ -95,13 +103,13 @@ export default function ClubDetails() {
 
   // Separate events into upcoming and past
   const now = new Date();
-  now.setMilliseconds(0); // Normalize milliseconds for comparison
+  now.setMilliseconds(0);
   
   const upcomingEvents = events.filter(event => {
     if (!event.dateISO) return false;
     try {
       const eventDate = new Date(event.dateISO);
-      if (isNaN(eventDate.getTime())) return false; // Invalid date
+      if (isNaN(eventDate.getTime())) return false;
       return eventDate.getTime() >= now.getTime();
     } catch (e) {
       console.error('Error parsing event date:', event.dateISO, e);
@@ -113,13 +121,13 @@ export default function ClubDetails() {
     if (!event.dateISO) return false;
     try {
       const eventDate = new Date(event.dateISO);
-      if (isNaN(eventDate.getTime())) return false; // Invalid date
+      if (isNaN(eventDate.getTime())) return false;
       return eventDate.getTime() < now.getTime();
     } catch (e) {
       console.error('Error parsing event date:', event.dateISO, e);
       return false;
     }
-  }).reverse(); // Reverse to show most recent first
+  }).reverse();
   
   // Debug: Log event counts
   console.log('=== Event Filtering Debug ===');
@@ -168,7 +176,7 @@ export default function ClubDetails() {
           style={styles.container}
           showsVerticalScrollIndicator={false}
         >
-          {/* Hero Image with Overlay Navigation */}
+          {/* Hero Image */}
           <View style={styles.heroContainer}>
             <Image
               source={{
@@ -181,7 +189,6 @@ export default function ClubDetails() {
               resizeMode="cover"
             />
             
-            {/* Navigation Overlay */}
             <View style={styles.heroHeader}>
               <TouchableOpacity 
                 style={styles.backButtonOverlay} 
@@ -192,7 +199,6 @@ export default function ClubDetails() {
               </TouchableOpacity>
             </View>
 
-            {/* Category Badge Overlay */}
             <View style={styles.heroOverlay}>
               <View
                 style={[
@@ -205,7 +211,7 @@ export default function ClubDetails() {
             </View>
           </View>
 
-          {/* Club Info Section */}
+          {/* Club Info */}
           <View style={styles.contentSection}>
             <Text style={styles.title}>{club.name}</Text>
             
@@ -217,7 +223,9 @@ export default function ClubDetails() {
             <View style={styles.ratingRow}>
               <Ionicons name="calendar" size={16} color="#3B82F6" />
               <Text style={styles.ratingText}>{upcomingEvents.length}</Text>
-              <Text style={styles.reviewsText}>upcoming event{upcomingEvents.length !== 1 ? "s" : ""}</Text>
+              <Text style={styles.reviewsText}>
+                upcoming event{upcomingEvents.length !== 1 ? "s" : ""}
+              </Text>
             </View>
 
             <Text style={styles.description}>{club.description || "No description available."}</Text>
@@ -229,14 +237,11 @@ export default function ClubDetails() {
               <Text style={styles.sectionTitle}>Events</Text>
             </View>
 
-            {/* Tabs - Always visible */}
+            {/* Event Tabs */}
             <View style={styles.tabsContainer}>
               <TouchableOpacity
                 style={[styles.tab, activeTab === 'upcoming' && styles.tabActive]}
-                onPress={() => {
-                  console.log('Switching to upcoming tab');
-                  setActiveTab('upcoming');
-                }}
+                onPress={() => setActiveTab('upcoming')}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.tabText, activeTab === 'upcoming' && styles.tabTextActive]}>
@@ -245,10 +250,7 @@ export default function ClubDetails() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.tab, activeTab === 'past' && styles.tabActive]}
-                onPress={() => {
-                  console.log('Switching to past tab, past events count:', pastEvents.length);
-                  setActiveTab('past');
-                }}
+                onPress={() => setActiveTab('past')}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.tabText, activeTab === 'past' && styles.tabTextActive]}>
@@ -257,6 +259,7 @@ export default function ClubDetails() {
               </TouchableOpacity>
             </View>
 
+            {/* Event Cards */}
             {displayedEvents.length > 0 ? (
               <View style={styles.eventsList}>
                 {displayedEvents.map((event) => (
@@ -314,7 +317,9 @@ export default function ClubDetails() {
                   {activeTab === 'upcoming' ? 'No upcoming events' : 'No past events'}
                 </Text>
                 <Text style={styles.emptyEventsSubtext}>
-                  {activeTab === 'upcoming' ? 'Check back later for new events' : 'No past events to display'}
+                  {activeTab === 'upcoming'
+                    ? 'Check back later for new events'
+                    : 'No past events to display'}
                 </Text>
               </View>
             )}
@@ -384,12 +389,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-start",
     paddingTop: 60,
-  },
-  backText: { 
-    color: "#3B82F6", 
-    fontSize: 15,
-    fontWeight: "500",
-    marginTop: 12,
   },
   categoryBadge: {
     borderRadius: 20,
