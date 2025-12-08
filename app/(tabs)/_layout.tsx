@@ -2,25 +2,29 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { Platform } from "react-native";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
+import { useAppTheme, LightThemeColors } from "../../src/ThemeContext";
 
 export default function Layout() {
   const { profile } = useAuthUser();
   const hasMemberships = profile?.memberships && profile.memberships.length > 0;
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#111827",
-        tabBarInactiveTintColor: "#9CA3AF",
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.subtitle,
         tabBarStyle: {
-          backgroundColor: "#FFFFFF",
+          backgroundColor: colors.card,
           borderTopWidth: 0.5,
-          borderTopColor: "#F3F4F6",
+          borderTopColor: colors.border,
           height: Platform.OS === 'ios' ? 85 : 60,
           paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           paddingTop: 8,
           shadowColor: "#000",
-          shadowOpacity: 0.05,
+          shadowOpacity: isDark ? 0.3 : 0.05,
           shadowRadius: 10,
           shadowOffset: { width: 0, height: -2 },
           elevation: 8,

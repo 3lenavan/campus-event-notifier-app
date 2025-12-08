@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthUser } from '../hooks/useAuthUser';
 import { getPendingEvents, approveEvent, rejectEvent } from '../services/eventsService';
 import { Event } from '../types';
+import { useAppTheme, LightThemeColors } from '../ThemeContext';
 
 interface ClubModerationPanelProps {
   clubId: string;
@@ -21,6 +22,9 @@ interface ClubModerationPanelProps {
 
 export const ClubModerationPanel: React.FC<ClubModerationPanelProps> = ({ clubId, clubName }) => {
   const { profile } = useAuthUser();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
   const [pendingEvents, setPendingEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [rejectingEventId, setRejectingEventId] = useState<string | null>(null);
@@ -87,8 +91,8 @@ export const ClubModerationPanel: React.FC<ClubModerationPanelProps> = ({ clubId
 
   if (!isClubMember) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.noAccessText}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.noAccessText, { color: colors.text }]}>
           You must be a member of {clubName} to moderate events.
         </Text>
       </View>
@@ -97,65 +101,66 @@ export const ClubModerationPanel: React.FC<ClubModerationPanelProps> = ({ clubId
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={styles.loadingText}>Loading pending events...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.text }]}>Loading pending events...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Ionicons name="shield-checkmark" size={24} color="#3B82F6" />
-        <Text style={styles.title}>Moderate Events</Text>
-        <Text style={styles.subtitle}>{clubName}</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
+        <Text style={[styles.title, { color: colors.text }]}>Moderate Events</Text>
+        <Text style={[styles.subtitle, { color: colors.subtitle }]}>{clubName}</Text>
       </View>
 
       {pendingEvents.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="checkmark-circle" size={48} color="#10B981" />
-          <Text style={styles.emptyText}>No pending events</Text>
-          <Text style={styles.emptySubText}>All events are up to date</Text>
+          <Text style={[styles.emptyText, { color: colors.text }]}>No pending events</Text>
+          <Text style={[styles.emptySubText, { color: colors.subtitle }]}>All events are up to date</Text>
         </View>
       ) : (
         <ScrollView style={styles.eventsList}>
           {pendingEvents.map((event) => (
-            <View key={event.id} style={styles.eventCard}>
+            <View key={event.id} style={[styles.eventCard, { backgroundColor: colors.card }]}>
               <View style={styles.eventHeader}>
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>PENDING</Text>
+                <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: isDark ? '#78350F' : '#FEF3C7' }]}>
+                  <Text style={[styles.statusText, { color: '#D97706' }]}>PENDING</Text>
                 </View>
               </View>
               
-              <Text style={styles.eventDescription}>{event.description}</Text>
+              <Text style={[styles.eventDescription, { color: colors.subtitle }]}>{event.description}</Text>
               
               <View style={styles.eventDetails}>
                 <View style={styles.detailRow}>
-                  <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-                  <Text style={styles.detailText}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.subtitle} />
+                  <Text style={[styles.detailText, { color: colors.subtitle }]}>
                     {new Date(event.dateISO).toLocaleDateString()}
                   </Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Ionicons name="time-outline" size={16} color="#6B7280" />
-                  <Text style={styles.detailText}>
+                  <Ionicons name="time-outline" size={16} color={colors.subtitle} />
+                  <Text style={[styles.detailText, { color: colors.subtitle }]}>
                     {new Date(event.dateISO).toLocaleTimeString()}
                   </Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Ionicons name="location-outline" size={16} color="#6B7280" />
-                  <Text style={styles.detailText}>{event.location}</Text>
+                  <Ionicons name="location-outline" size={16} color={colors.subtitle} />
+                  <Text style={[styles.detailText, { color: colors.subtitle }]}>{event.location}</Text>
                 </View>
               </View>
 
               {rejectingEventId === event.id ? (
-                <View style={styles.rejectForm}>
-                  <Text style={styles.rejectLabel}>Reason for rejection:</Text>
+                <View style={[styles.rejectForm, { backgroundColor: isDark ? '#7F1D1D' : '#FEF2F2', borderColor: '#FECACA' }]}>
+                  <Text style={[styles.rejectLabel, { color: '#DC2626' }]}>Reason for rejection:</Text>
                   <TextInput
-                    style={styles.rejectInput}
+                    style={[styles.rejectInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
                     placeholder="Enter reason for rejection..."
+                    placeholderTextColor={colors.placeholderText}
                     value={rejectNote}
                     onChangeText={setRejectNote}
                     multiline
@@ -205,41 +210,33 @@ export const ClubModerationPanel: React.FC<ClubModerationPanelProps> = ({ clubId
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
   },
   loadingText: {
     marginTop: 16,
-    color: '#6B7280',
     fontSize: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
     marginLeft: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B7280',
     marginLeft: 8,
   },
   noAccessText: {
     textAlign: 'center',
-    color: '#6B7280',
     fontSize: 16,
     margin: 32,
   },
@@ -252,12 +249,10 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
     marginTop: 16,
   },
   emptySubText: {
     fontSize: 14,
-    color: '#6B7280',
     marginTop: 8,
   },
   eventsList: {
@@ -265,7 +260,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   eventCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -283,11 +277,9 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
     flex: 1,
   },
   statusBadge: {
-    backgroundColor: '#FEF3C7',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -295,11 +287,9 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#D97706',
   },
   eventDescription: {
     fontSize: 14,
-    color: '#6B7280',
     marginBottom: 12,
     lineHeight: 20,
   },
@@ -313,7 +303,6 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 14,
-    color: '#6B7280',
     marginLeft: 8,
   },
   actionButtons: {
@@ -348,21 +337,16 @@ const styles = StyleSheet.create({
   rejectForm: {
     marginTop: 16,
     padding: 16,
-    backgroundColor: '#FEF2F2',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FECACA',
   },
   rejectLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#DC2626',
     marginBottom: 8,
   },
   rejectInput: {
-    backgroundColor: 'white',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
     borderRadius: 6,
     padding: 12,
     fontSize: 14,

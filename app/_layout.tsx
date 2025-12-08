@@ -2,10 +2,10 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { useColorScheme } from "react-native";
 import { seedClubsOnce } from "../src/bootstrap/seedClubs";
 import { useAuthUser } from "../src/hooks/useAuthUser";
 import { initializeNotifications } from "../src/lib/notifications";
+import { ThemeProviderCustom, useAppTheme, LightThemeColors, DarkThemeColors } from "../src/ThemeContext";
 
 const LightTheme = {
   ...DefaultTheme,
@@ -32,10 +32,9 @@ const DarkThemeCustom = {
   },
 };
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const theme = isDark ? DarkThemeCustom : LightTheme;
+function RootLayoutContent() {
+  const { theme, isDark } = useAppTheme();
+  const navigationTheme = isDark ? DarkThemeCustom : LightTheme;
   const { user } = useAuthUser();
 
   // Initialize app data on startup
@@ -61,17 +60,17 @@ export default function RootLayout() {
   }, [user?.uid]);
 
   return (
-    <ThemeProvider value={theme}>
-      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={isDark ? "#0b0c0e" : "#f7f8fa"} />
+    <ThemeProvider value={navigationTheme}>
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={isDark ? DarkThemeColors.background : "#f7f8fa"} />
       <Stack
         screenOptions={{
           headerShown: false,
           gestureEnabled: true,
           animation: "fade",
-          contentStyle: { backgroundColor: theme.colors.background },
-          headerStyle: { backgroundColor: theme.colors.card },
+          contentStyle: { backgroundColor: navigationTheme.colors.background },
+          headerStyle: { backgroundColor: navigationTheme.colors.card },
           headerTitleStyle: { fontWeight: "600" },
-          headerTintColor: theme.colors.text,
+          headerTintColor: navigationTheme.colors.text,
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -117,5 +116,13 @@ export default function RootLayout() {
         />
       </Stack>
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProviderCustom>
+      <RootLayoutContent />
+    </ThemeProviderCustom>
   );
 }

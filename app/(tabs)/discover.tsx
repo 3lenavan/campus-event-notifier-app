@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getClubs, Club } from "../../data/dataLoader";
 import { getClubEventCount } from "../../src/services/eventsService";
+import { useAppTheme, LightThemeColors } from "../../src/ThemeContext";
 
 export default function Discover() {
   const router = useRouter();
@@ -20,6 +21,9 @@ export default function Discover() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [eventCounts, setEventCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
 
   // Load club data from Supabase when screen mounts
   useEffect(() => {
@@ -84,34 +88,34 @@ export default function Discover() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <Text style={{ color: "#6B7280" }}>Loading clubs...</Text>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.subtitle }}>Loading clubs...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.background, borderColor: colors.border }]}>
         <View>
-          <Text style={styles.headerTitle}>Discover</Text>
-          <Text style={styles.headerSubtitle}>Find clubs and organizations</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Discover</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.subtitle }]}>Find clubs and organizations</Text>
         </View>
       </View>
 
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
         <Ionicons
           name="search-outline"
           size={20}
-          color="#9CA3AF"
+          color={colors.subtitle}
           style={styles.searchIcon}
         />
         <TextInput
-          style={styles.input}
+          style={[styles.input, { color: colors.text }]}
           placeholder="Search clubs, categories..."
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.placeholderText}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -120,7 +124,7 @@ export default function Discover() {
             onPress={() => setSearchQuery("")}
             style={styles.clearButton}
           >
-            <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+            <Ionicons name="close-circle" size={20} color={colors.subtitle} />
           </TouchableOpacity>
         )}
       </View>
@@ -132,16 +136,16 @@ export default function Discover() {
       >
         {filteredClubs.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="search-outline" size={48} color="#D1D5DB" />
-            <Text style={styles.emptyText}>No clubs found</Text>
-            <Text style={styles.emptySubText}>Try a different search term</Text>
+            <Ionicons name="search-outline" size={48} color={colors.subtitle} />
+            <Text style={[styles.emptyText, { color: colors.text }]}>No clubs found</Text>
+            <Text style={[styles.emptySubText, { color: colors.subtitle }]}>Try a different search term</Text>
           </View>
         ) : (
           filteredClubs.map((club) => (
             <TouchableOpacity
               key={club.id}
               activeOpacity={0.9}
-              style={styles.clubCard}
+              style={[styles.clubCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={() =>
                 router.push({
                   pathname: "/clubs/[id]" as any,
@@ -173,21 +177,21 @@ export default function Discover() {
               </View>
 
               <View style={styles.clubInfo}>
-                <Text style={styles.clubName} numberOfLines={2}>
+                <Text style={[styles.clubName, { color: colors.text }]} numberOfLines={2}>
                   {club.name}
                 </Text>
-                <Text style={styles.clubDescription} numberOfLines={2}>
+                <Text style={[styles.clubDescription, { color: colors.subtitle }]} numberOfLines={2}>
                   {club.description || "No description available"}
                 </Text>
 
-                <View style={styles.footerRow}>
+                <View style={[styles.footerRow, { borderTopColor: colors.border }]}>
                   <View style={styles.eventInfo}>
-                    <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-                    <Text style={styles.eventCount}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.subtitle} />
+                    <Text style={[styles.eventCount, { color: colors.subtitle }]}>
                       {getEventCount(club)} event{getEventCount(club) !== 1 ? "s" : ""}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                  <Ionicons name="chevron-forward" size={20} color={colors.subtitle} />
                 </View>
               </View>
             </TouchableOpacity>
@@ -200,37 +204,31 @@ export default function Discover() {
 
 // Styles
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     paddingTop: 8,
     paddingBottom: 12,
     paddingHorizontal: 20,
-    backgroundColor: "#FFFFFF",
     borderBottomWidth: 0.5,
-    borderColor: "#F3F4F6",
   },
   headerTitle: { 
     fontSize: 28, 
-    fontWeight: "700", 
-    color: "#111827",
+    fontWeight: "700",
     letterSpacing: -0.5,
   },
   headerSubtitle: { 
-    fontSize: 14, 
-    color: "#6B7280",
+    fontSize: 14,
     marginTop: 2,
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
     marginHorizontal: 20,
     marginTop: 16,
     marginBottom: 20,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
     paddingHorizontal: 16,
     paddingVertical: 12,
     shadowColor: "#000",
@@ -242,7 +240,6 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: "#111827",
     paddingLeft: 8,
     paddingVertical: 0,
   },
@@ -262,18 +259,15 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyText: { 
-    color: "#374151", 
     fontSize: 16,
     fontWeight: "500",
     marginTop: 16,
   },
   emptySubText: { 
-    fontSize: 14, 
-    color: "#9CA3AF", 
+    fontSize: 14,
     marginTop: 8,
   },
   clubCard: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     marginBottom: 24,
     overflow: "hidden",
@@ -283,7 +277,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
     borderWidth: 0.5,
-    borderColor: "#F3F4F6",
   },
   imageContainer: {
     position: "relative",
@@ -307,14 +300,12 @@ const styles = StyleSheet.create({
   },
   clubName: { 
     fontWeight: "700", 
-    fontSize: 20, 
-    color: "#111827",
+    fontSize: 20,
     lineHeight: 26,
     marginBottom: 8,
     letterSpacing: -0.3,
   },
   clubDescription: {
-    color: "#6B7280",
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 12,
@@ -326,7 +317,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
   },
   eventInfo: {
     flexDirection: "row",
@@ -350,8 +340,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   eventCount: { 
-    fontSize: 13, 
-    color: "#6B7280",
+    fontSize: 13,
     fontWeight: "500",
   },
 });

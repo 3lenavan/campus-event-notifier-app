@@ -16,9 +16,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAppTheme, LightThemeColors } from "../src/ThemeContext";
 
 export default function UpdateEmail() {
   const user = auth.currentUser;
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -66,60 +70,64 @@ export default function UpdateEmail() {
         }}
       />
 
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         {/* HEADER WITH SPACING */}
         <View style={styles.headerContainer}>
-          <Text style={styles.title}>Update Email</Text>
-          <Text style={styles.subtitle}>Change your email address</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Update Email</Text>
+          <Text style={[styles.subtitle, { color: colors.subtitle }]}>Change your email address</Text>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.iconCircle}>
-            <Ionicons name="mail-outline" size={24} color="#2563eb" />
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.iconCircle, { backgroundColor: isDark ? colors.border : "#e0ebff" }]}>
+            <Ionicons name="mail-outline" size={24} color={colors.primary} />
           </View>
 
-          <Text style={styles.label}>Current Email</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Current Email</Text>
           <TextInput
-            style={[styles.input, { backgroundColor: "#f3f4f6" }]}
+            style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
             value={user?.email || ""}
             editable={false}
+            placeholderTextColor={colors.placeholderText}
           />
 
-          <Text style={styles.label}>Current Password</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Current Password</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
             placeholder="Enter your current password"
+            placeholderTextColor={colors.placeholderText}
             secureTextEntry
             value={currentPassword}
             onChangeText={setCurrentPassword}
           />
 
-          <Text style={styles.label}>New Email Address</Text>
+          <Text style={[styles.label, { color: colors.text }]}>New Email Address</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
             placeholder="Enter new email"
+            placeholderTextColor={colors.placeholderText}
             autoCapitalize="none"
             keyboardType="email-address"
             value={newEmail}
             onChangeText={setNewEmail}
           />
 
-          <Text style={styles.label}>Confirm New Email</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Confirm New Email</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
             placeholder="Confirm new email"
+            placeholderTextColor={colors.placeholderText}
             autoCapitalize="none"
             keyboardType="email-address"
             value={confirmEmail}
             onChangeText={setConfirmEmail}
           />
 
-          <TouchableOpacity style={styles.button} onPress={handleUpdateEmail}>
+          <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={handleUpdateEmail}>
             <Text style={styles.buttonText}>Update Email Address</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.note}>
+        <Text style={[styles.note, { color: colors.subtitle }]}>
           <Text style={{ fontWeight: "700" }}>Note:</Text> You may need to
           verify your current email before updating.
         </Text>
@@ -131,7 +139,6 @@ export default function UpdateEmail() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#fff",
   },
 
   /* 🔥 NEW header padding wrapper */
@@ -144,19 +151,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#111827",
   },
   subtitle: {
     fontSize: 14,
-    color: "#6b7280",
     marginTop: 2,
   },
 
   card: {
-    backgroundColor: "#f9fafb",
     borderRadius: 14,
     padding: 16,
     marginHorizontal: 20,
+    borderWidth: 1,
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 3 },
@@ -166,7 +171,6 @@ const styles = StyleSheet.create({
 
   iconCircle: {
     alignSelf: "center",
-    backgroundColor: "#e0ebff",
     padding: 14,
     borderRadius: 50,
     marginBottom: 16,
@@ -175,21 +179,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#111827",
     marginTop: 10,
   },
 
   input: {
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#d1d5db",
     borderRadius: 8,
     padding: 12,
     marginTop: 4,
   },
 
   button: {
-    backgroundColor: "#111827",
     borderRadius: 8,
     paddingVertical: 12,
     marginTop: 18,
@@ -205,7 +205,6 @@ const styles = StyleSheet.create({
   note: {
     paddingHorizontal: 20,
     marginTop: 8,
-    color: "#6b7280",
     fontSize: 13,
   },
 });

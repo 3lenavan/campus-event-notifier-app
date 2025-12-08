@@ -17,9 +17,13 @@ import { verifyClubMembership } from "../services/profileService";
 import { supabase } from "../../data/supabaseClient";
 import { listClubs } from "../services/clubsService";
 import { Club } from "../types";
+import { useAppTheme, LightThemeColors } from "../ThemeContext";
 
 export const VerifyClub = () => {
   const { user, refreshProfile } = useAuthUser();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
 
   const [clubs, setClubs] = useState<Club[]>([]);
   const [myClubs, setMyClubs] = useState<Club[]>([]);
@@ -97,24 +101,25 @@ export const VerifyClub = () => {
         setShowList(false);
       }}
     >
-      <Text style={styles.clubName}>{item.name}</Text>
-      <Ionicons name="chevron-forward" size={20} />
+      <Text style={[styles.clubName, { color: colors.text }]}>{item.name}</Text>
+      <Ionicons name="chevron-forward" size={20} color={colors.subtitle} />
     </TouchableOpacity>
   );
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
       <View style={styles.inner}>
-        <Text style={styles.title}>Verify Club Membership</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Verify Club Membership</Text>
 
-        <View style={styles.inputRow}>
-          <Ionicons name="school" size={20} color="#777" />
+        <View style={[styles.inputRow, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
+          <Ionicons name="school" size={20} color={colors.subtitle} />
           <TextInput
             placeholder="Club name or slug"
-            style={styles.input}
+            placeholderTextColor={colors.placeholderText}
+            style={[styles.input, { color: colors.text }]}
             value={clubInput}
             onChangeText={(t) => {
               setClubInput(t);
@@ -129,15 +134,16 @@ export const VerifyClub = () => {
             data={filtered.slice(0, 5)}
             renderItem={renderClub}
             keyExtractor={(i) => i.slug}
-            style={styles.dropdown}
+            style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}
           />
         )}
 
-        <View style={styles.inputRow}>
-          <Ionicons name="key" size={20} color="#777" />
+        <View style={[styles.inputRow, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
+          <Ionicons name="key" size={20} color={colors.subtitle} />
           <TextInput
             placeholder="Verification code"
-            style={styles.input}
+            placeholderTextColor={colors.placeholderText}
+            style={[styles.input, { color: colors.text }]}
             value={codeInput}
             onChangeText={setCodeInput}
             autoCapitalize="none"
@@ -145,7 +151,7 @@ export const VerifyClub = () => {
         </View>
 
         <TouchableOpacity
-          style={styles.button}
+          style={[styles.button, { backgroundColor: colors.primary }]}
           onPress={handleVerify}
           disabled={loading}
         >
@@ -157,12 +163,12 @@ export const VerifyClub = () => {
         </TouchableOpacity>
 
         <View style={styles.myClubs}>
-          <Text style={styles.subtitle}>Your Clubs</Text>
+          <Text style={[styles.subtitle, { color: colors.text }]}>Your Clubs</Text>
 
           {myClubs.map((c) => (
             <View key={c.id} style={styles.myClubRow}>
               <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-              <Text style={styles.myClubText}>{c.name}</Text>
+              <Text style={[styles.myClubText, { color: colors.text }]}>{c.name}</Text>
             </View>
           ))}
         </View>
@@ -172,24 +178,20 @@ export const VerifyClub = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8F9FA" },
+  container: { flex: 1 },
   inner: { padding: 20 },
   title: { fontSize: 22, fontWeight: "bold", marginBottom: 20 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
     padding: 12,
     borderRadius: 8,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#DDD",
   },
   input: { marginLeft: 10, flex: 1 },
   dropdown: {
-    backgroundColor: "#fff",
     borderRadius: 8,
-    borderColor: "#DDD",
     borderWidth: 1,
     marginBottom: 10,
   },
@@ -200,7 +202,6 @@ const styles = StyleSheet.create({
   },
   clubName: { fontSize: 16 },
   button: {
-    backgroundColor: "#1D4ED8",
     padding: 14,
     borderRadius: 8,
     marginTop: 10,

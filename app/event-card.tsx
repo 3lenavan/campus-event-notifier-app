@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAppTheme, LightThemeColors } from "../src/ThemeContext";
 
 export interface Event {
   id: string;
@@ -49,6 +50,9 @@ export function EventCard({
   likesCount,
   compact = false,
 }: EventCardProps) {
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
 
   // ALWAYS USE dateISO when available
   const getDisplayDate = () => {
@@ -80,12 +84,12 @@ export function EventCard({
   if (compact) {
     return (
       <TouchableOpacity
-        style={styles.compactCard}
+        style={[styles.compactCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={() => onPress(event)}
         activeOpacity={0.8}
       >
         <View style={styles.rowBetween}>
-          <Text style={styles.compactTitle} numberOfLines={1}>
+          <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>
             {event.title}
           </Text>
           <View
@@ -103,19 +107,19 @@ export function EventCard({
             <Ionicons
               name="calendar-outline"
               size={14}
-              color="#6B7280"
+              color={colors.subtitle}
               style={{ marginRight: 4 }}
             />
-            <Text style={styles.iconText}>{getDisplayDate()}</Text>
+            <Text style={[styles.iconText, { color: colors.subtitle }]}>{getDisplayDate()}</Text>
           </View>
           <View style={styles.iconItem}>
             <Ionicons
               name="time-outline"
               size={14}
-              color="#6B7280"
+              color={colors.subtitle}
               style={{ marginRight: 4 }}
             />
-            <Text style={styles.iconText}>{event.time}</Text>
+            <Text style={[styles.iconText, { color: colors.subtitle }]}>{event.time}</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -124,7 +128,7 @@ export function EventCard({
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={() => onPress(event)}
       activeOpacity={0.9}
     >
@@ -175,11 +179,11 @@ export function EventCard({
         )}
       </View>
 
-      <View style={styles.cardContent}>
+      <View style={[styles.cardContent, { backgroundColor: colors.card }]}>
         <View style={styles.headerRow}>
           <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={14} color="#6B7280" />
-            <Text style={styles.locationText}>{event.location}</Text>
+            <Ionicons name="location-outline" size={14} color={colors.subtitle} />
+            <Text style={[styles.locationText, { color: colors.subtitle }]}>{event.location}</Text>
           </View>
           {typeof likesCount === "number" && likesCount > 0 && (
             <View style={styles.ratingRow}>
@@ -189,27 +193,27 @@ export function EventCard({
           )}
         </View>
 
-        <Text style={styles.title} numberOfLines={2}>
+        <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
           {event.title}
         </Text>
 
-        <Text style={styles.description} numberOfLines={2}>
+        <Text style={[styles.description, { color: colors.subtitle }]} numberOfLines={2}>
           {event.description}
         </Text>
 
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
-            <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-            <Text style={styles.metaText}>{getDisplayDate()}</Text>
+            <Ionicons name="calendar-outline" size={16} color={colors.subtitle} />
+            <Text style={[styles.metaText, { color: colors.text }]}>{getDisplayDate()}</Text>
           </View>
           <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={16} color="#6B7280" />
-            <Text style={styles.metaText}>{event.time}</Text>
+            <Ionicons name="time-outline" size={16} color={colors.subtitle} />
+            <Text style={[styles.metaText, { color: colors.text }]}>{event.time}</Text>
           </View>
         </View>
 
         <TouchableOpacity
-          style={styles.seeMoreButton}
+          style={[styles.seeMoreButton, { backgroundColor: colors.primary }]}
           onPress={() => onPress(event)}
         >
           <Text style={styles.seeMoreText}>See more</Text>
@@ -222,12 +226,10 @@ export function EventCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     marginBottom: 24,
     overflow: "hidden",
     borderWidth: 0.5,
-    borderColor: "#F3F4F6",
   },
 
   imageContainer: {
@@ -260,7 +262,6 @@ const styles = StyleSheet.create({
 
   cardContent: {
     padding: 20,
-    backgroundColor: "#FFFFFF",
   },
 
   headerRow: {
@@ -276,7 +277,6 @@ const styles = StyleSheet.create({
 
   locationText: {
     fontSize: 13,
-    color: "#6B7280",
     marginLeft: 4,
   },
 
@@ -300,12 +300,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     marginBottom: 8,
-    color: "#111827",
   },
 
   description: {
     fontSize: 15,
-    color: "#6B7280",
     marginBottom: 16,
   },
 
@@ -322,7 +320,6 @@ const styles = StyleSheet.create({
 
   metaText: {
     marginLeft: 6,
-    color: "#374151",
     fontWeight: "500",
   },
 
@@ -330,7 +327,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#111827",
     paddingVertical: 14,
     borderRadius: 12,
   },
@@ -343,12 +339,10 @@ const styles = StyleSheet.create({
   },
 
   compactCard: {
-    backgroundColor: "white",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 0.5,
-    borderColor: "#F3F4F6",
   },
 
   compactTitle: {
@@ -369,7 +363,6 @@ const styles = StyleSheet.create({
 
   iconText: {
     fontSize: 13,
-    color: "#6B7280",
     fontWeight: "500",
   },
 

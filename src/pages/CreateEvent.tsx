@@ -22,6 +22,7 @@ import { useAuthUser } from '../hooks/useAuthUser';
 import { listClubs } from '../services/clubsService';
 import { createEvent } from '../services/eventsService';
 import { Club } from '../types';
+import { useAppTheme, LightThemeColors } from '../ThemeContext';
 
 // Updated import to use rewritten image picker and uploader
 import { pickImage, uploadEventImage } from '../services/imageUploadService';
@@ -33,6 +34,9 @@ interface CreateEventProps {
 export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   const router = useRouter();
   const { user } = useAuthUser();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
 
   const [clubs, setClubs] = useState<Club[]>([]);
   const [userClubIds, setUserClubIds] = useState<string[]>([]);
@@ -198,10 +202,10 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
   if (!user) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centered}>
-          <Ionicons name="lock-closed" size={48} color="#6B7280" />
-          <Text style={styles.centeredText}>Please sign in to create events</Text>
+          <Ionicons name="lock-closed" size={48} color={colors.subtitle} />
+          <Text style={[styles.centeredText, { color: colors.text }]}>Please sign in to create events</Text>
         </View>
       </View>
     );
@@ -211,12 +215,12 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
   if (userClubs.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centered}>
-          <Ionicons name="people-outline" size={48} color="#6B7280" />
-          <Text style={styles.centeredText}>You need to join a club first</Text>
+          <Ionicons name="people-outline" size={48} color={colors.subtitle} />
+          <Text style={[styles.centeredText, { color: colors.text }]}>You need to join a club first</Text>
           <TouchableOpacity
-            style={styles.verifyButton}
+            style={[styles.verifyButton, { backgroundColor: colors.primary }]}
             onPress={() => router.push('/verify-club')}
           >
             <Text style={styles.verifyButtonText}>Verify Club Membership</Text>
@@ -227,31 +231,33 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
-          <Text style={styles.title}>Create Event</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Create Event</Text>
 
           {/* Club selection */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Select Club *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Select Club *</Text>
             <View style={styles.clubSelector}>
               {userClubs.map((club) => (
                 <TouchableOpacity
                   key={club.id}
                   style={[
                     styles.clubOption,
-                    selectedClubId === club.id && styles.clubOptionSelected,
+                    { backgroundColor: isDark ? colors.border : '#E5E7EB' },
+                    selectedClubId === club.id && [styles.clubOptionSelected, { backgroundColor: colors.primary }],
                   ]}
                   onPress={() => setSelectedClubId(club.id)}
                 >
                   <Text
                     style={[
                       styles.clubOptionText,
+                      { color: colors.text },
                       selectedClubId === club.id && styles.clubOptionTextSelected,
                     ]}
                   >
@@ -264,10 +270,11 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
           {/* Event Title */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Event Title *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Event Title *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
               placeholder="Enter event title"
+              placeholderTextColor={colors.placeholderText}
               value={title}
               onChangeText={setTitle}
             />
@@ -275,10 +282,11 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
           {/* Description */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Description *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Description *</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
               placeholder="Describe your event..."
+              placeholderTextColor={colors.placeholderText}
               value={description}
               onChangeText={setDescription}
               multiline
@@ -287,14 +295,14 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
           {/* Date and time pickers */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Date & Time *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Date & Time *</Text>
             <View style={styles.dateTimeContainer}>
               <TouchableOpacity
-                style={styles.dateTimeButton}
+                style={[styles.dateTimeButton, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}
                 onPress={() => setShowDatePicker(true)}
               >
-                <Ionicons name="calendar-outline" size={20} color="#1D4ED8" />
-                <Text style={styles.dateTimeText}>
+                <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                <Text style={[styles.dateTimeText, { color: colors.text }]}>
                   {eventDate.toLocaleDateString('en-US', {
                     weekday: 'short',
                     year: 'numeric',
@@ -304,11 +312,11 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.dateTimeButton}
+                style={[styles.dateTimeButton, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}
                 onPress={() => setShowTimePicker(true)}
               >
-                <Ionicons name="time-outline" size={20} color="#1D4ED8" />
-                <Text style={styles.dateTimeText}>
+                <Ionicons name="time-outline" size={20} color={colors.primary} />
+                <Text style={[styles.dateTimeText, { color: colors.text }]}>
                   {eventDate.toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -378,24 +386,25 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
           {/* Location */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Location *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Location *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
               placeholder="Building - Room 123"
+              placeholderTextColor={colors.placeholderText}
               value={location}
               onChangeText={handleLocationChange}
             />
             {locationError && (
-              <Text style={styles.errorTextSmall}>{locationError}</Text>
+              <Text style={[styles.errorTextSmall, { color: '#DC2626' }]}>{locationError}</Text>
             )}
           </View>
 
           {/* Image Picker Section (Updated) */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Event Image (Optional)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Event Image (Optional)</Text>
 
             {selectedImageUri ? (
-              <View style={styles.imagePreviewContainer}>
+              <View style={[styles.imagePreviewContainer, { borderColor: colors.border }]}>
                 <Image
                   source={{ uri: selectedImageUri }}
                   style={styles.imagePreview}
@@ -410,16 +419,16 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
               </View>
             ) : (
               <TouchableOpacity
-                style={styles.imagePickerButton}
+                style={[styles.imagePickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}
                 onPress={handlePickImage}
                 disabled={uploadingImage}
               >
                 {uploadingImage ? (
-                  <ActivityIndicator color="#1D4ED8" />
+                  <ActivityIndicator color={colors.primary} />
                 ) : (
                   <>
-                    <Ionicons name="image-outline" size={20} color="#1D4ED8" />
-                    <Text style={styles.imagePickerText}>Select Image</Text>
+                    <Ionicons name="image-outline" size={20} color={colors.primary} />
+                    <Text style={[styles.imagePickerText, { color: colors.primary }]}>Select Image</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -428,7 +437,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
           {/* Validation errors */}
           {validationErrors.length > 0 && (
-            <View style={styles.errorContainer}>
+            <View style={[styles.errorContainer, { backgroundColor: isDark ? '#7F1D1D' : '#FEE2E2' }]}>
               {validationErrors.map((error, idx) => (
                 <Text key={idx} style={styles.errorText}>
                   • {error}
@@ -439,7 +448,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
           {/* Submit Button */}
           <TouchableOpacity
-            style={[styles.createButton, loading && styles.buttonDisabled]}
+            style={[styles.createButton, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
             onPress={handleCreateEvent}
             disabled={loading}
           >
@@ -460,13 +469,12 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1 },
   scrollContent: { padding: 20 },
   content: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centeredText: { fontSize: 16, marginTop: 16 },
   verifyButton: {
-    backgroundColor: '#1D4ED8',
     padding: 10,
     borderRadius: 8,
     marginTop: 10,
@@ -476,10 +484,8 @@ const styles = StyleSheet.create({
   inputContainer: { marginBottom: 20 },
   label: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
   input: {
-    backgroundColor: 'white',
     padding: 12,
     borderRadius: 8,
-    borderColor: '#D6E4FF',
     borderWidth: 1,
   },
   textArea: { height: 120, textAlignVertical: 'top' },
@@ -491,16 +497,13 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     padding: 12,
     borderRadius: 8,
-    borderColor: '#D6E4FF',
     borderWidth: 1,
     gap: 8,
   },
   dateTimeText: {
     fontSize: 14,
-    color: '#111827',
     fontWeight: '500',
   },
   iosPickerActions: {
@@ -521,41 +524,37 @@ const styles = StyleSheet.create({
   clubOption: {
     padding: 10,
     borderRadius: 20,
-    backgroundColor: '#E5E7EB',
   },
-  clubOptionSelected: { backgroundColor: '#1D4ED8' },
+  clubOptionSelected: { },
   clubOptionTextSelected: { color: 'white' },
-  clubOptionText: { color: '#111827' },
+  clubOptionText: { },
   createButton: {
     padding: 14,
-    backgroundColor: '#1D4ED8',
     borderRadius: 999,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   createButtonText: { color: 'white', fontWeight: '600', marginLeft: 8 },
   buttonDisabled: { opacity: 0.6 },
   errorContainer: {
-    backgroundColor: '#FEE2E2',
     padding: 10,
     borderRadius: 6,
     marginBottom: 10,
   },
   errorText: { color: '#DC2626' },
-  errorTextSmall: { color: 'red', fontSize: 12 },
+  errorTextSmall: { fontSize: 12 },
   imagePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
     padding: 12,
     borderRadius: 8,
-    borderColor: '#D6E4FF',
     borderWidth: 1,
     borderStyle: 'dashed',
     gap: 8,
   },
   imagePickerText: {
-    color: '#1D4ED8',
     fontWeight: '500',
   },
   imagePreviewContainer: {
@@ -563,7 +562,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#D6E4FF',
   },
   imagePreview: {
     width: '100%',

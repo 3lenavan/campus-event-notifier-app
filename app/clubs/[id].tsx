@@ -19,10 +19,14 @@ import {
 } from "../../data/dataLoader";
 import { supabase } from "../../data/supabaseClient";
 import { auth } from "../../src/lib/firebase";
+import { useAppTheme, LightThemeColors } from "../../src/ThemeContext";
 
 export default function ClubDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
 
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,16 +130,16 @@ export default function ClubDetails() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.notFound}>Loading club...</Text>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.notFound, { color: colors.text }]}>Loading club...</Text>
       </View>
     );
   }
 
   if (!club) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.notFound}>Club not found.</Text>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.notFound, { color: colors.text }]}>Club not found.</Text>
       </View>
     );
   }
@@ -144,34 +148,34 @@ export default function ClubDetails() {
     <>
       <Stack.Screen options={{ title: club.name, headerShown: false }} />
 
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#F9FAFB" }}>
-        <ScrollView style={styles.container}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={22} color="#111827" />
-            <Text style={styles.backText}>Back to Discover</Text>
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+            <Text style={[styles.backText, { color: colors.text }]}>Back to Discover</Text>
           </TouchableOpacity>
 
-          <Text style={styles.title}>{club.name}</Text>
-          <Text style={styles.description}>{club.description}</Text>
-          <Text style={styles.category}>Category: {club.category}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{club.name}</Text>
+          <Text style={[styles.description, { color: colors.subtitle }]}>{club.description}</Text>
+          <Text style={[styles.category, { color: colors.subtitle }]}>Category: {club.category}</Text>
 
-          <Text style={styles.sectionTitle}>Upcoming Events</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Upcoming Events</Text>
 
           {club.events && club.events.length > 0 ? (
             club.events.map((event: any) => {
               const isRsvped = userRsvps.includes(event.id);
 
               return (
-                <View key={event.id} style={styles.eventCard}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventDate}>Date: {event.date}</Text>
-                  <Text style={styles.eventLocation}>
+                <View key={event.id} style={[styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                  <Text style={[styles.eventDate, { color: colors.subtitle }]}>Date: {event.date}</Text>
+                  <Text style={[styles.eventLocation, { color: colors.subtitle }]}>
                     Location: {event.location}
                   </Text>
-                  <Text style={styles.eventDescription}>
+                  <Text style={[styles.eventDescription, { color: colors.subtitle }]}>
                     {event.description}
                   </Text>
 
@@ -189,7 +193,7 @@ export default function ClubDetails() {
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
-                      style={styles.rsvpButton}
+                      style={[styles.rsvpButton, { backgroundColor: colors.primary }]}
                       onPress={() => handleRSVP(event.id)}
                       disabled={rsvpLoadingEventId === event.id}
                     >
@@ -204,7 +208,7 @@ export default function ClubDetails() {
               );
             })
           ) : (
-            <Text style={styles.noEvents}>No upcoming events.</Text>
+            <Text style={[styles.noEvents, { color: colors.subtitle }]}>No upcoming events.</Text>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -214,31 +218,28 @@ export default function ClubDetails() {
 
 // Styles
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB", padding: 16 },
+  container: { flex: 1, padding: 16 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  notFound: { fontSize: 16, color: "#6B7280" },
+  notFound: { fontSize: 16 },
   backButton: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  backText: { color: "#111827", fontSize: 15, marginLeft: 6 },
+  backText: { fontSize: 15, marginLeft: 6 },
   title: { fontSize: 24, fontWeight: "700", marginBottom: 8 },
-  description: { fontSize: 15, color: "#374151", marginBottom: 12 },
-  category: { fontSize: 13, color: "#6B7280", marginBottom: 20 },
+  description: { fontSize: 15, marginBottom: 12 },
+  category: { fontSize: 13, marginBottom: 20 },
   sectionTitle: { fontSize: 20, fontWeight: "600", marginBottom: 10 },
   eventCard: {
-    backgroundColor: "white",
     borderRadius: 12,
     padding: 12,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
   },
   eventTitle: { fontSize: 16, fontWeight: "600" },
-  eventDate: { color: "#6B7280", marginTop: 4 },
-  eventLocation: { color: "#6B7280", marginTop: 2 },
-  eventDescription: { color: "#374151", marginTop: 6 },
-  noEvents: { color: "#9CA3AF", marginTop: 4 },
+  eventDate: { marginTop: 4 },
+  eventLocation: { marginTop: 2 },
+  eventDescription: { marginTop: 6 },
+  noEvents: { marginTop: 4 },
   rsvpButton: {
     marginTop: 12,
-    backgroundColor: "#3B82F6",
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: "center",

@@ -13,12 +13,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { getEventPolicy, setEventPolicy, EventPolicy } from '../lib/eventPolicy';
 import { listClubs } from '../services/clubsService';
 import { Club } from '../types';
+import { useAppTheme, LightThemeColors } from '../ThemeContext';
 
 interface EventCreationSettingsProps {
   onClose: () => void;
 }
 
 export const EventCreationSettings: React.FC<EventCreationSettingsProps> = ({ onClose }) => {
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
   const [policy, setPolicy] = useState<EventPolicy | null>(null);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,76 +100,77 @@ export const EventCreationSettings: React.FC<EventCreationSettingsProps> = ({ on
 
   if (loading || !policy) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Event Creation Settings</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <Text style={[styles.title, { color: colors.text }]}>Event Creation Settings</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color="#6B7280" />
+            <Ionicons name="close" size={24} color={colors.subtitle} />
           </TouchableOpacity>
         </View>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading settings...</Text>
+          <Text style={[styles.loadingText, { color: colors.subtitle }]}>Loading settings...</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Event Creation Settings</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Event Creation Settings</Text>
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Ionicons name="close" size={24} color="#6B7280" />
+          <Ionicons name="close" size={24} color={colors.subtitle} />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Global Toggle */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Global Settings</Text>
-          <View style={styles.toggleRow}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Global Settings</Text>
+          <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.toggleInfo}>
-              <Text style={styles.toggleLabel}>Enable Event Creation</Text>
-              <Text style={styles.toggleDescription}>
+              <Text style={[styles.toggleLabel, { color: colors.text }]}>Enable Event Creation</Text>
+              <Text style={[styles.toggleDescription, { color: colors.subtitle }]}>
                 Master toggle for all event creation
               </Text>
             </View>
             <Switch
               value={policy.enabledGlobal}
               onValueChange={updateGlobalToggle}
-              trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
-              thumbColor={policy.enabledGlobal ? '#FFFFFF' : '#FFFFFF'}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="#FFFFFF"
             />
           </View>
         </View>
 
         {/* Club-Specific Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Club-Specific Settings</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Club-Specific Settings</Text>
           
           {/* Search */}
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={16} color="#9CA3AF" style={styles.searchIcon} />
+          <View style={[styles.searchContainer, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
+            <Ionicons name="search" size={16} color={colors.subtitle} style={styles.searchIcon} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: colors.text }]}
               placeholder="Search clubs..."
+              placeholderTextColor={colors.placeholderText}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
           </View>
 
           {/* Club List */}
-          <View style={styles.clubList}>
+          <View style={[styles.clubList, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {filteredClubs.map((club) => (
-              <View key={club.id} style={styles.clubRow}>
+              <View key={club.id} style={[styles.clubRow, { borderBottomColor: colors.border }]}>
                 <View style={styles.clubInfo}>
-                  <Text style={styles.clubName}>{club.name}</Text>
-                  <Text style={styles.clubCategory}>{club.category}</Text>
+                  <Text style={[styles.clubName, { color: colors.text }]}>{club.name}</Text>
+                  <Text style={[styles.clubCategory, { color: colors.subtitle }]}>{club.category}</Text>
                 </View>
                 <Switch
                   value={policy.enabledByClub[club.id] ?? true}
                   onValueChange={(enabled) => updateClubToggle(club.id, enabled)}
-                  trackColor={{ false: '#E5E7EB', true: '#10B981' }}
+                  trackColor={{ false: colors.border, true: '#10B981' }}
                   thumbColor="#FFFFFF"
                 />
               </View>
@@ -175,88 +180,88 @@ export const EventCreationSettings: React.FC<EventCreationSettingsProps> = ({ on
 
         {/* Moderation Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Moderation</Text>
-          <View style={styles.radioGroup}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Moderation</Text>
+          <View style={[styles.radioGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TouchableOpacity
-              style={styles.radioOption}
+              style={[styles.radioOption, { borderBottomColor: colors.border }]}
               onPress={() => updateModerationMode('off')}
             >
-              <View style={styles.radioButton}>
-                {policy.moderationMode === 'off' && <View style={styles.radioSelected} />}
+              <View style={[styles.radioButton, { borderColor: colors.border }]}>
+                {policy.moderationMode === 'off' && <View style={[styles.radioSelected, { backgroundColor: colors.primary }]} />}
               </View>
-              <Text style={styles.radioLabel}>No Moderation</Text>
+              <Text style={[styles.radioLabel, { color: colors.text }]}>No Moderation</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.radioOption}
               onPress={() => updateModerationMode('clubModerator')}
             >
-              <View style={styles.radioButton}>
-                {policy.moderationMode === 'clubModerator' && <View style={styles.radioSelected} />}
+              <View style={[styles.radioButton, { borderColor: colors.border }]}>
+                {policy.moderationMode === 'clubModerator' && <View style={[styles.radioSelected, { backgroundColor: colors.primary }]} />}
               </View>
-              <Text style={styles.radioLabel}>Club Moderator Review</Text>
+              <Text style={[styles.radioLabel, { color: colors.text }]}>Club Moderator Review</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Limits */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Limits</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Limits</Text>
           
-          <View style={styles.limitRow}>
-            <Text style={styles.limitLabel}>Max Events per Club per Day</Text>
+          <View style={[styles.limitRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.limitLabel, { color: colors.text }]}>Max Events per Club per Day</Text>
             <TextInput
-              style={styles.numberInput}
+              style={[styles.numberInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
               value={policy.limits.maxPerClubPerDay.toString()}
               onChangeText={(text) => updateLimit('maxPerClubPerDay', parseInt(text) || 0)}
               keyboardType="numeric"
             />
           </View>
 
-          <View style={styles.limitRow}>
-            <Text style={styles.limitLabel}>User Cooldown (minutes)</Text>
+          <View style={[styles.limitRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.limitLabel, { color: colors.text }]}>User Cooldown (minutes)</Text>
             <TextInput
-              style={styles.numberInput}
+              style={[styles.numberInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
               value={policy.limits.userCooldownMinutes.toString()}
               onChangeText={(text) => updateLimit('userCooldownMinutes', parseInt(text) || 0)}
               keyboardType="numeric"
             />
           </View>
 
-          <View style={styles.limitRow}>
-            <Text style={styles.limitLabel}>Max Title Length</Text>
+          <View style={[styles.limitRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.limitLabel, { color: colors.text }]}>Max Title Length</Text>
             <TextInput
-              style={styles.numberInput}
+              style={[styles.numberInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
               value={policy.limits.maxTitleLen.toString()}
               onChangeText={(text) => updateLimit('maxTitleLen', parseInt(text) || 0)}
               keyboardType="numeric"
             />
           </View>
 
-          <View style={styles.limitRow}>
-            <Text style={styles.limitLabel}>Max Description Length</Text>
+          <View style={[styles.limitRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.limitLabel, { color: colors.text }]}>Max Description Length</Text>
             <TextInput
-              style={styles.numberInput}
+              style={[styles.numberInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
               value={policy.limits.maxDescLen.toString()}
               onChangeText={(text) => updateLimit('maxDescLen', parseInt(text) || 0)}
               keyboardType="numeric"
             />
           </View>
 
-          <View style={styles.limitRow}>
-            <Text style={styles.limitLabel}>Allow Images</Text>
+          <View style={[styles.limitRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.limitLabel, { color: colors.text }]}>Allow Images</Text>
             <Switch
               value={policy.limits.allowImages}
               onValueChange={(value) => updateLimit('allowImages', value)}
-              trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
+              trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor="#FFFFFF"
             />
           </View>
 
           {policy.limits.allowImages && (
-            <View style={styles.limitRow}>
-              <Text style={styles.limitLabel}>Max Image Size (MB)</Text>
+            <View style={[styles.limitRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.limitLabel, { color: colors.text }]}>Max Image Size (MB)</Text>
               <TextInput
-                style={styles.numberInput}
+                style={[styles.numberInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
                 value={policy.limits.maxImageMB.toString()}
                 onChangeText={(text) => updateLimit('maxImageMB', parseInt(text) || 0)}
                 keyboardType="numeric"
@@ -272,7 +277,6 @@ export const EventCreationSettings: React.FC<EventCreationSettingsProps> = ({ on
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
   },
   header: {
     flexDirection: 'row',
@@ -280,14 +284,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
   },
   closeButton: {
     padding: 4,
@@ -303,7 +304,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6B7280',
   },
   section: {
     marginBottom: 24,
@@ -311,18 +311,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
     marginBottom: 12,
   },
   toggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   toggleInfo: {
     flex: 1,
@@ -330,20 +327,16 @@ const styles = StyleSheet.create({
   toggleLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#111827',
   },
   toggleDescription: {
     fontSize: 14,
-    color: '#6B7280',
     marginTop: 2,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     marginBottom: 12,
     paddingHorizontal: 12,
   },
@@ -354,13 +347,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#111827',
   },
   clubList: {
-    backgroundColor: 'white',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   clubRow: {
     flexDirection: 'row',
@@ -368,7 +358,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   clubInfo: {
     flex: 1,
@@ -376,32 +365,26 @@ const styles = StyleSheet.create({
   clubName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#111827',
   },
   clubCategory: {
     fontSize: 12,
-    color: '#6B7280',
     marginTop: 2,
   },
   radioGroup: {
-    backgroundColor: 'white',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   radioOption: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   radioButton: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#D1D5DB',
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -410,26 +393,21 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#3B82F6',
   },
   radioLabel: {
     fontSize: 16,
-    color: '#111827',
   },
   limitRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     marginBottom: 8,
   },
   limitLabel: {
     fontSize: 14,
-    color: '#111827',
     flex: 1,
   },
   numberInput: {
@@ -437,10 +415,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
     borderRadius: 6,
     textAlign: 'center',
     fontSize: 14,
-    color: '#111827',
   },
 });

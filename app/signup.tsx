@@ -1,9 +1,9 @@
-import { useTheme } from "@react-navigation/native";
 import { router } from "expo-router";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { useState } from "react";
-import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from "react-native";
+import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { auth } from "../src/lib/firebase";
+import { useAppTheme, LightThemeColors } from "../src/ThemeContext";
 
 export default function Signup() {
   // Store form inputs
@@ -12,8 +12,9 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const theme = useTheme();
-  const colorScheme = useColorScheme();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
 
   const isValidEmail = (value: string) => /.+@.+\..+/.test(value);
 
@@ -79,36 +80,40 @@ export default function Signup() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: '#F0F7FF' }]}> 
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}> 
       <View style={styles.container}>
-        <View style={styles.heroBubble} />
-        <View style={styles.heroBubbleSmall} />
-        <View style={[styles.card, styles.glassCard]}> 
-          <Text style={[styles.title, { color: theme.colors.primary }]}>Create Account</Text>
+        {!isDark && (
+          <>
+            <View style={styles.heroBubble} />
+            <View style={styles.heroBubbleSmall} />
+          </>
+        )}
+        <View style={[styles.card, styles.glassCard, { backgroundColor: isDark ? colors.card : 'rgba(255, 255, 255, 0.85)', borderColor: isDark ? colors.border : 'rgba(255, 255, 255, 0.6)' }]}> 
+          <Text style={[styles.title, { color: colors.primary }]}>Create Account</Text>
 
           {/* First Name Input */}
           <TextInput
-            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: colorScheme === "dark" ? "#0f1113" : "#fff" }]}
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
             placeholder="First Name"
-            placeholderTextColor={colorScheme === "dark" ? "#6b7280" : "#9aa0a6"}
+            placeholderTextColor={colors.placeholderText}
             value={firstName}
             onChangeText={setFirstName}
           />
 
           {/* Last Name Input */}
           <TextInput
-            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: colorScheme === "dark" ? "#0f1113" : "#fff" }]}
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
             placeholder="Last Name"
-            placeholderTextColor={colorScheme === "dark" ? "#6b7280" : "#9aa0a6"}
+            placeholderTextColor={colors.placeholderText}
             value={lastName}
             onChangeText={setLastName}
           />
 
           {/* Email Input */}
           <TextInput
-            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: colorScheme === "dark" ? "#0f1113" : "#fff" }]}
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
             placeholder="Email"
-            placeholderTextColor={colorScheme === "dark" ? "#6b7280" : "#9aa0a6"}
+            placeholderTextColor={colors.placeholderText}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -118,9 +123,9 @@ export default function Signup() {
 
           {/* Password Input */}
           <TextInput
-            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: colorScheme === "dark" ? "#0f1113" : "#fff" }]}
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
             placeholder="Password"
-            placeholderTextColor={colorScheme === "dark" ? "#6b7280" : "#9aa0a6"}
+            placeholderTextColor={colors.placeholderText}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -128,13 +133,13 @@ export default function Signup() {
           />
 
           {/* Submit button */}
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]} onPress={signUp}>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={signUp}>
             <Text style={styles.primaryBtnText}>Sign Up</Text>
           </TouchableOpacity>
 
           {/* Back to login */}
-          <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: '#FACC15', borderColor: 'transparent' }]} onPress={() => router.replace("/")}>
-            <Text style={[styles.secondaryBtnText, { color: '#111827' }]}>Back to Login</Text>
+          <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: isDark ? colors.border : '#FACC15', borderColor: 'transparent' }]} onPress={() => router.replace("/")}>
+            <Text style={[styles.secondaryBtnText, { color: isDark ? colors.text : '#111827' }]}>Back to Login</Text>
           </TouchableOpacity>
         </View>
       </View>

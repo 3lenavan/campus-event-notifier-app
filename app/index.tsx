@@ -1,15 +1,16 @@
-import { useTheme } from "@react-navigation/native";
 import { router } from "expo-router";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { useState } from "react";
-import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from "react-native";
+import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { auth } from "../src/lib/firebase";
+import { useAppTheme, LightThemeColors } from "../src/ThemeContext";
 
 export default function Index() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const theme = useTheme();
-  const colorScheme = useColorScheme();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
   
   const isValidEmail = (value: string) => /.+@.+\..+/.test(value);
 
@@ -111,22 +112,26 @@ export default function Index() {
     }
   };
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: '#F0F7FF' }]}> 
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}> 
       <View style={styles.container}>
-        <View style={[styles.heroBubble]} />
-        <View style={[styles.heroBubbleSmall]} />
-        <View style={[styles.heroBubbleMid]} />
-        <View style={[styles.card, styles.glassCard]}> 
-          <Text style={[styles.appName, { color: theme.colors.primary }]}>🐝 BuzzUp</Text>
+        {!isDark && (
+          <>
+            <View style={[styles.heroBubble]} />
+            <View style={[styles.heroBubbleSmall]} />
+            <View style={[styles.heroBubbleMid]} />
+          </>
+        )}
+        <View style={[styles.card, styles.glassCard, { backgroundColor: isDark ? colors.card : 'rgba(255, 255, 255, 0.85)', borderColor: isDark ? colors.border : 'rgba(255, 255, 255, 0.6)' }]}> 
+          <Text style={[styles.appName, { color: colors.primary }]}>🐝 BuzzUp</Text>
           <Text style={[styles.tagline, { color: "#F59E0B" }]}>Penmen Notifier!</Text>
-          <Text style={[styles.subtitle, { color: colorScheme === "dark" ? "#9aa0a6" : "#6b7280" }]}>Sign in or create an account</Text>
+          <Text style={[styles.subtitle, { color: colors.subtitle }]}>Sign in or create an account</Text>
 
           <View style={styles.spacer} />
 
           <TextInput
-            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: colorScheme === "dark" ? "#0f1113" : "#fff" }]}
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
             placeholder="Email"
-            placeholderTextColor={colorScheme === "dark" ? "#6b7280" : "#9aa0a6"}
+            placeholderTextColor={colors.placeholderText}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -135,9 +140,9 @@ export default function Index() {
           />
 
           <TextInput
-            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: colorScheme === "dark" ? "#0f1113" : "#fff" }]}
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
             placeholder="Password"
-            placeholderTextColor={colorScheme === "dark" ? "#6b7280" : "#9aa0a6"}
+            placeholderTextColor={colors.placeholderText}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -146,12 +151,12 @@ export default function Index() {
 
           <View style={styles.spacer} />
 
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]} onPress={signIn}>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={signIn}>
             <Text style={styles.primaryBtnText}>Sign In</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: '#FACC15', borderColor: 'transparent' }]} onPress={() => router.replace("/signup")}>
-            <Text style={[styles.secondaryBtnText, { color: '#111827' }]}>Create Account</Text>
+          <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: isDark ? colors.border : '#FACC15', borderColor: 'transparent' }]} onPress={() => router.replace("/signup")}>
+            <Text style={[styles.secondaryBtnText, { color: isDark ? colors.text : '#111827' }]}>Create Account</Text>
           </TouchableOpacity>
         </View>
       </View>

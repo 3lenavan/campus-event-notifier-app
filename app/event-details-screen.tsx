@@ -35,6 +35,7 @@ import {
   toggleFavorite as toggleFavoriteService,
   toggleLike as toggleLikeService
 } from "../src/services/interactionsService";
+import { useAppTheme, LightThemeColors } from "../src/ThemeContext";
 
 // Event interface
 interface Event {
@@ -57,6 +58,9 @@ interface Event {
 export default function EventDetails() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
 
   // Event state
   const [event, setEvent] = useState<Event | null>(null);
@@ -443,17 +447,17 @@ export default function EventDetails() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <Text>Loading event...</Text>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.text }}>Loading event...</Text>
       </View>
     );
   }
 
   if (!event) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.notFoundText}>Event not found</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButtonText}>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.notFoundText, { color: colors.text }]}>Event not found</Text>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backButtonText, { backgroundColor: colors.primary }]}>
           <Text style={styles.backButtonTextLabel}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -488,7 +492,7 @@ export default function EventDetails() {
   const isEventPast = new Date(event.date) < new Date();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -529,59 +533,59 @@ export default function EventDetails() {
         </View>
 
         {/* Content Section */}
-        <View style={styles.contentSection}>
-          <Text style={styles.title}>{event.title}</Text>
+        <View style={[styles.contentSection, { backgroundColor: colors.background }]}>
+          <Text style={[styles.title, { color: colors.text }]}>{event.title}</Text>
           
           {club && (
             <View style={styles.clubRow}>
-              <Ionicons name="people" size={16} color="#3B82F6" />
-              <Text style={styles.clubText}>{club.name}</Text>
+              <Ionicons name="people" size={16} color={colors.primary} />
+              <Text style={[styles.clubText, { color: colors.primary }]}>{club.name}</Text>
             </View>
           )}
           
           <View style={styles.locationRow}>
-            <Ionicons name="location" size={16} color="#10B981" />
-            <Text style={styles.locationText}>{event.location}</Text>
+            <Ionicons name="location" size={16} color={colors.primary} />
+            <Text style={[styles.locationText, { color: colors.subtitle }]}>{event.location}</Text>
           </View>
 
           {likeCount > 0 && (
             <View style={styles.ratingRow}>
               <Ionicons name="heart" size={16} color="#EF4444" />
-              <Text style={styles.ratingText}>{likeCount}</Text>
-              <Text style={styles.reviewsText}>likes</Text>
+              <Text style={[styles.ratingText, { color: "#EF4444" }]}>{likeCount}</Text>
+              <Text style={[styles.reviewsText, { color: colors.subtitle }]}>likes</Text>
             </View>
           )}
 
           {/* Description with Read More */}
           <View style={styles.descriptionSection}>
-            <Text style={styles.description} numberOfLines={undefined}>
+            <Text style={[styles.description, { color: colors.subtitle }]} numberOfLines={undefined}>
               {event.fullDescription || event.description}
             </Text>
           </View>
 
           {/* Event Details */}
-          <View style={styles.detailsCard}>
+          <View style={[styles.detailsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.detailItem}>
-              <Ionicons name="calendar-outline" size={20} color="#6B7280" />
+              <Ionicons name="calendar-outline" size={20} color={colors.subtitle} />
               <View style={styles.detailContent}>
-                <Text style={styles.detailLabel}>Date</Text>
-                <Text style={styles.detailValue}>{formatDate(event.date)}</Text>
+                <Text style={[styles.detailLabel, { color: colors.subtitle }]}>Date</Text>
+                <Text style={[styles.detailValue, { color: colors.text }]}>{formatDate(event.date)}</Text>
               </View>
             </View>
 
             <View style={styles.detailItem}>
-              <Ionicons name="time-outline" size={20} color="#6B7280" />
+              <Ionicons name="time-outline" size={20} color={colors.subtitle} />
               <View style={styles.detailContent}>
-                <Text style={styles.detailLabel}>Time</Text>
-                <Text style={styles.detailValue}>{event.time}</Text>
+                <Text style={[styles.detailLabel, { color: colors.subtitle }]}>Time</Text>
+                <Text style={[styles.detailValue, { color: colors.text }]}>{event.time}</Text>
               </View>
             </View>
 
             <View style={styles.detailItem}>
-              <Ionicons name="people-outline" size={20} color="#6B7280" />
+              <Ionicons name="people-outline" size={20} color={colors.subtitle} />
               <View style={styles.detailContent}>
-                <Text style={styles.detailLabel}>Attendees</Text>
-                <Text style={styles.detailValue}>
+                <Text style={[styles.detailLabel, { color: colors.subtitle }]}>Attendees</Text>
+                <Text style={[styles.detailValue, { color: colors.text }]}>
                   {event.attendees} {event.maxAttendees && `/ ${event.maxAttendees} max`}
                 </Text>
               </View>
@@ -599,9 +603,9 @@ export default function EventDetails() {
               <Ionicons
                 name={liked ? "heart" : "heart-outline"}
                 size={22}
-                color={liked ? "#EF4444" : "#6B7280"}
+                color={liked ? "#EF4444" : colors.subtitle}
               />
-              <Text style={[styles.actionText, liked && styles.likedText]}>
+              <Text style={[styles.actionText, { color: colors.subtitle }, liked && styles.likedText]}>
                 {likeCount} {likeCount === 1 ? 'like' : 'likes'}
               </Text>
             </TouchableOpacity>
@@ -609,18 +613,18 @@ export default function EventDetails() {
 
           {/* RSVP Button */}
           {isEventPast ? (
-            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton]}>
+            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border }]}>
               <Text style={styles.primaryButtonText}>Event has ended</Text>
             </TouchableOpacity>
           ) : isEventFull && !event.isUserAttending ? (
-            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton]}>
+            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border }]}>
               <Text style={styles.primaryButtonText}>Event is full</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               style={[
                 styles.primaryButton,
-                event.isUserAttending && styles.cancelButtonStyle,
+                { backgroundColor: event.isUserAttending ? colors.border : colors.primary },
               ]}
               onPress={() => handleRSVP(event.id, event.title)}
               activeOpacity={0.8}
@@ -628,7 +632,7 @@ export default function EventDetails() {
               <Text
                 style={[
                   styles.primaryButtonText,
-                  event.isUserAttending && styles.cancelButtonText,
+                  event.isUserAttending && { color: colors.text },
                 ]}
               >
                 {event.isUserAttending ? "Cancel RSVP" : "RSVP to Event"}
@@ -638,12 +642,12 @@ export default function EventDetails() {
 
           {/* Add to Calendar Button */}
           <TouchableOpacity
-            style={styles.secondaryButton}
+            style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => handleAddToCalendar(event)}
             activeOpacity={0.8}
           >
-            <Ionicons name="calendar-outline" size={20} color="#111827" />
-            <Text style={styles.secondaryButtonText}>Add to Calendar</Text>
+            <Ionicons name="calendar-outline" size={20} color={colors.text} />
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Add to Calendar</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -653,7 +657,7 @@ export default function EventDetails() {
 
 // Styles
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { paddingBottom: 120 },
   heroContainer: {
@@ -695,12 +699,10 @@ const styles = StyleSheet.create({
   },
   contentSection: {
     padding: 20,
-    backgroundColor: "#FFFFFF",
   },
   title: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#111827",
     marginBottom: 12,
     letterSpacing: -0.5,
     lineHeight: 38,
@@ -713,7 +715,6 @@ const styles = StyleSheet.create({
   },
   clubText: {
     fontSize: 15,
-    color: "#3B82F6",
     fontWeight: "600",
   },
   locationRow: {
@@ -724,7 +725,6 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 15,
-    color: "#6B7280",
     fontWeight: "500",
   },
   ratingRow: {
@@ -735,26 +735,23 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 15,
-    color: "#EF4444",
     fontWeight: "600",
   },
   reviewsText: {
     fontSize: 15,
-    color: "#6B7280",
   },
   descriptionSection: {
     marginBottom: 24,
   },
   description: {
     fontSize: 16,
-    color: "#6B7280",
     lineHeight: 24,
   },
   detailsCard: {
-    backgroundColor: "#F9FAFB",
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
+    borderWidth: 1,
   },
   detailItem: {
     flexDirection: "row",
@@ -767,13 +764,11 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 13,
-    color: "#6B7280",
     marginBottom: 4,
     fontWeight: "500",
   },
   detailValue: {
     fontSize: 16,
-    color: "#111827",
     fontWeight: "600",
   },
   actionsCard: {
@@ -787,14 +782,12 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 15,
-    color: "#6B7280",
     fontWeight: "500",
   },
   likedText: {
     color: "#EF4444",
   },
   primaryButton: {
-    backgroundColor: "#111827",
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
@@ -806,40 +799,32 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   cancelButtonStyle: {
-    backgroundColor: "#F3F4F6",
   },
   cancelButtonText: {
-    color: "#111827",
   },
   disabledButton: {
-    backgroundColor: "#9CA3AF",
   },
   secondaryButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F9FAFB",
     borderRadius: 12,
     paddingVertical: 14,
     gap: 8,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
   },
   secondaryButtonText: {
-    color: "#111827",
     fontSize: 16,
     fontWeight: "600",
   },
   notFoundText: {
     fontSize: 18,
-    color: "#374151",
     fontWeight: "600",
     marginBottom: 16,
   },
   backButtonText: {
     paddingVertical: 12,
     paddingHorizontal: 24,
-    backgroundColor: "#111827",
     borderRadius: 12,
   },
   backButtonTextLabel: {

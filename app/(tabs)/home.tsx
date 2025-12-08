@@ -8,6 +8,7 @@ import { listApprovedEvents } from "../../src/services/eventsService";
 import { listClubs } from "../../src/services/clubsService";
 import { getEventsInteractions, toggleFavorite as toggleFavoriteService, toggleLike as toggleLikeService } from "../../src/services/interactionsService";
 import EventCard, { Event as BaseEvent } from "../event-card";
+import { useAppTheme, LightThemeColors } from "../../src/ThemeContext";
 
 
 type FeedEvent = BaseEvent & {
@@ -23,6 +24,9 @@ type FeedEvent = BaseEvent & {
 
 export default function HomeScreen() {
   const { user, profile } = useAuthUser();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
   
   useEffect(() => {
     const unsub = getAuth().onAuthStateChanged((user) => {
@@ -218,21 +222,21 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         ListHeaderComponent={
           <View style={styles.header}>
             <View>
-              <Text style={styles.headerTitle}>{getUserGreeting()}</Text>
-              <Text style={styles.headerSubtitle}>Welcome to Campus Events</Text>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>{getUserGreeting()}</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.subtitle }]}>Welcome to Campus Events</Text>
             </View>
             {user && (
-              <View style={styles.avatar}>
+              <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
                 <Text style={styles.avatarText}>
                   {(profile?.name || user?.displayName || user?.email || "?")[0].toUpperCase()}
                 </Text>
@@ -254,8 +258,8 @@ export default function HomeScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No events available</Text>
-            <Text style={styles.emptySubtext}>Check back later for new events</Text>
+            <Text style={[styles.emptyText, { color: colors.text }]}>No events available</Text>
+            <Text style={[styles.emptySubtext, { color: colors.subtitle }]}>Check back later for new events</Text>
           </View>
         }
       />
@@ -264,7 +268,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  container: { flex: 1 },
   listContent: { paddingHorizontal: 20, paddingBottom: 120, alignItems: 'stretch' },
   header: {
     flexDirection: "row",
@@ -277,20 +281,17 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#111827",
     letterSpacing: -0.5,
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: "#6B7280",
     fontWeight: "400",
   },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#3B82F6",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
@@ -312,11 +313,9 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#374151",
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#9CA3AF",
   },
 });

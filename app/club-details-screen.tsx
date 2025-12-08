@@ -7,11 +7,15 @@ import { Club, getClubByIdSupabase } from "../data/dataLoader";
 import { useAuthUser } from "../src/hooks/useAuthUser";
 import { listClubEvents } from "../src/services/eventsService";
 import { getEventsInteractions } from "../src/services/interactionsService";
+import { useAppTheme, LightThemeColors } from "../src/ThemeContext";
 
 export default function ClubDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuthUser();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<any[]>([]);
@@ -144,20 +148,20 @@ export default function ClubDetails() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={styles.loadingText}>Loading club...</Text>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.text }]}>Loading club...</Text>
       </View>
     );
   }
 
   if (!club) {
     return (
-      <View style={styles.center}>
-        <Ionicons name="alert-circle-outline" size={48} color="#9CA3AF" />
-        <Text style={styles.notFound}>Club not found.</Text>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Ionicons name="alert-circle-outline" size={48} color={colors.subtitle} />
+        <Text style={[styles.notFound, { color: colors.text }]}>Club not found.</Text>
         <TouchableOpacity 
-          style={styles.backButtonText} 
+          style={[styles.backButtonText, { backgroundColor: colors.primary }]} 
           onPress={() => router.back()}
           activeOpacity={0.8}
         >
@@ -171,9 +175,9 @@ export default function ClubDetails() {
     <>
       <Stack.Screen options={{ title: club.name, headerShown: false }} />
 
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <ScrollView 
-          style={styles.container}
+          style={[styles.container, { backgroundColor: colors.background }]}
           showsVerticalScrollIndicator={false}
         >
           {/* Hero Image */}
@@ -213,47 +217,47 @@ export default function ClubDetails() {
 
           {/* Club Info */}
           <View style={styles.contentSection}>
-            <Text style={styles.title}>{club.name}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{club.name}</Text>
             
             <View style={styles.locationRow}>
-              <Ionicons name="location" size={16} color="#10B981" />
-              <Text style={styles.locationText}>Campus Organization</Text>
+              <Ionicons name="location" size={16} color={colors.primary} />
+              <Text style={[styles.locationText, { color: colors.subtitle }]}>Campus Organization</Text>
             </View>
 
             <View style={styles.ratingRow}>
-              <Ionicons name="calendar" size={16} color="#3B82F6" />
-              <Text style={styles.ratingText}>{upcomingEvents.length}</Text>
-              <Text style={styles.reviewsText}>
+              <Ionicons name="calendar" size={16} color={colors.primary} />
+              <Text style={[styles.ratingText, { color: colors.primary }]}>{upcomingEvents.length}</Text>
+              <Text style={[styles.reviewsText, { color: colors.subtitle }]}>
                 upcoming event{upcomingEvents.length !== 1 ? "s" : ""}
               </Text>
             </View>
 
-            <Text style={styles.description}>{club.description || "No description available."}</Text>
+            <Text style={[styles.description, { color: colors.subtitle }]}>{club.description || "No description available."}</Text>
           </View>
 
           {/* Events Section */}
           <View style={styles.eventsSection}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Events</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Events</Text>
             </View>
 
             {/* Event Tabs */}
-            <View style={styles.tabsContainer}>
+            <View style={[styles.tabsContainer, { backgroundColor: isDark ? colors.border : "#F3F4F6" }]}>
               <TouchableOpacity
-                style={[styles.tab, activeTab === 'upcoming' && styles.tabActive]}
+                style={[styles.tab, activeTab === 'upcoming' && [styles.tabActive, { backgroundColor: colors.card }]]}
                 onPress={() => setActiveTab('upcoming')}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.tabText, activeTab === 'upcoming' && styles.tabTextActive]}>
+                <Text style={[styles.tabText, { color: colors.subtitle }, activeTab === 'upcoming' && [styles.tabTextActive, { color: colors.primary }]]}>
                   Upcoming ({upcomingEvents.length})
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tab, activeTab === 'past' && styles.tabActive]}
+                style={[styles.tab, activeTab === 'past' && [styles.tabActive, { backgroundColor: colors.card }]]}
                 onPress={() => setActiveTab('past')}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.tabText, activeTab === 'past' && styles.tabTextActive]}>
+                <Text style={[styles.tabText, { color: colors.subtitle }, activeTab === 'past' && [styles.tabTextActive, { color: colors.primary }]]}>
                   Past ({pastEvents.length})
                 </Text>
               </TouchableOpacity>
@@ -265,26 +269,26 @@ export default function ClubDetails() {
                 {displayedEvents.map((event) => (
                   <TouchableOpacity
                     key={event.id}
-                    style={styles.eventCard}
+                    style={[styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                     onPress={() => handleEventPress(event)}
                     activeOpacity={0.7}
                   >
                     <View style={styles.eventCardContent}>
-                      <Text style={styles.eventTitle}>{event.title}</Text>
+                      <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
                       
                       <View style={styles.eventDetails}>
                         <View style={styles.eventDetailRow}>
-                          <Text style={styles.eventDetailLabel}>Date:</Text>
-                          <Text style={styles.eventDetailValue}>{event.formattedDate}</Text>
+                          <Text style={[styles.eventDetailLabel, { color: colors.subtitle }]}>Date:</Text>
+                          <Text style={[styles.eventDetailValue, { color: colors.text }]}>{event.formattedDate}</Text>
                         </View>
                         
                         <View style={styles.eventDetailRow}>
-                          <Text style={styles.eventDetailLabel}>Location:</Text>
-                          <Text style={styles.eventDetailValue}>{event.location}</Text>
+                          <Text style={[styles.eventDetailLabel, { color: colors.subtitle }]}>Location:</Text>
+                          <Text style={[styles.eventDetailValue, { color: colors.text }]}>{event.location}</Text>
                         </View>
                         
                         {event.description && (
-                          <Text style={styles.eventDescription} numberOfLines={2}>
+                          <Text style={[styles.eventDescription, { color: colors.subtitle }]} numberOfLines={2}>
                             {event.description}
                           </Text>
                         )}
@@ -292,7 +296,7 @@ export default function ClubDetails() {
 
                       {activeTab === 'upcoming' ? (
                         <TouchableOpacity
-                          style={styles.rsvpButton}
+                          style={[styles.rsvpButton, { backgroundColor: colors.primary }]}
                           onPress={(e) => {
                             e.stopPropagation();
                             handleEventPress(event);
@@ -302,8 +306,8 @@ export default function ClubDetails() {
                           <Text style={styles.rsvpButtonText}>RSVP</Text>
                         </TouchableOpacity>
                       ) : (
-                        <View style={styles.pastEventBadge}>
-                          <Text style={styles.pastEventBadgeText}>Past Event</Text>
+                        <View style={[styles.pastEventBadge, { backgroundColor: colors.border }]}>
+                          <Text style={[styles.pastEventBadgeText, { color: colors.subtitle }]}>Past Event</Text>
                         </View>
                       )}
                     </View>
@@ -312,11 +316,11 @@ export default function ClubDetails() {
               </View>
             ) : (
               <View style={styles.emptyEvents}>
-                <Ionicons name="calendar-outline" size={48} color="#D1D5DB" />
-                <Text style={styles.emptyEventsText}>
+                <Ionicons name="calendar-outline" size={48} color={colors.subtitle} />
+                <Text style={[styles.emptyEventsText, { color: colors.text }]}>
                   {activeTab === 'upcoming' ? 'No upcoming events' : 'No past events'}
                 </Text>
-                <Text style={styles.emptyEventsSubtext}>
+                <Text style={[styles.emptyEventsSubtext, { color: colors.subtitle }]}>
                   {activeTab === 'upcoming'
                     ? 'Check back later for new events'
                     : 'No past events to display'}
@@ -333,22 +337,18 @@ export default function ClubDetails() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: "#FFFFFF",
   },
   center: { 
     flex: 1, 
     justifyContent: "center", 
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
   },
   loadingText: {
     marginTop: 12,
     fontSize: 15,
-    color: "#6B7280",
   },
   notFound: { 
     fontSize: 18, 
-    color: "#374151",
     fontWeight: "500",
     marginTop: 16,
   },
@@ -408,12 +408,10 @@ const styles = StyleSheet.create({
   },
   contentSection: {
     padding: 20,
-    backgroundColor: "#FFFFFF",
   },
   title: { 
     fontSize: 32, 
     fontWeight: "700", 
-    color: "#111827",
     marginBottom: 12,
     letterSpacing: -0.5,
     lineHeight: 38,
@@ -426,7 +424,6 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 15,
-    color: "#6B7280",
     fontWeight: "500",
   },
   ratingRow: {
@@ -437,23 +434,19 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 15,
-    color: "#3B82F6",
     fontWeight: "600",
   },
   reviewsText: {
     fontSize: 15,
-    color: "#6B7280",
   },
   description: { 
     fontSize: 16, 
-    color: "#6B7280", 
     lineHeight: 24,
     marginBottom: 8,
   },
   eventsSection: {
     padding: 20,
     paddingTop: 0,
-    backgroundColor: "#FFFFFF",
   },
   sectionHeader: {
     marginBottom: 20,
@@ -461,12 +454,10 @@ const styles = StyleSheet.create({
   sectionTitle: { 
     fontSize: 22, 
     fontWeight: "700",
-    color: "#111827",
     letterSpacing: -0.3,
   },
   tabsContainer: {
     flexDirection: "row",
-    backgroundColor: "#F3F4F6",
     borderRadius: 10,
     padding: 4,
     marginBottom: 20,
@@ -484,7 +475,6 @@ const styles = StyleSheet.create({
     minHeight: 42,
   },
   tabActive: {
-    backgroundColor: "#FFFFFF",
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -494,19 +484,15 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#6B7280",
   },
   tabTextActive: {
-    color: "#3B82F6",
   },
   eventsList: {
     gap: 16,
   },
   eventCard: {
-    backgroundColor: "#F9FAFB",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
     overflow: "hidden",
     shadowColor: "#000",
     shadowOpacity: 0.03,
@@ -520,7 +506,6 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#111827",
     marginBottom: 12,
   },
   eventDetails: {
@@ -533,23 +518,19 @@ const styles = StyleSheet.create({
   },
   eventDetailLabel: {
     fontSize: 14,
-    color: "#6B7280",
     fontWeight: "500",
     marginRight: 8,
   },
   eventDetailValue: {
     fontSize: 14,
-    color: "#111827",
     flex: 1,
   },
   eventDescription: {
     fontSize: 14,
-    color: "#6B7280",
     lineHeight: 20,
     marginTop: 8,
   },
   rsvpButton: {
-    backgroundColor: "#3B82F6",
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -562,7 +543,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   pastEventBadge: {
-    backgroundColor: "#E5E7EB",
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -570,7 +550,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pastEventBadgeText: {
-    color: "#6B7280",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -580,19 +559,16 @@ const styles = StyleSheet.create({
   },
   emptyEventsText: {
     fontSize: 16,
-    color: "#374151",
     fontWeight: "500",
     marginTop: 16,
   },
   emptyEventsSubtext: {
     fontSize: 14,
-    color: "#9CA3AF",
     marginTop: 8,
   },
   backButtonText: {
     paddingVertical: 12,
     paddingHorizontal: 24,
-    backgroundColor: "#111827",
     borderRadius: 12,
     marginTop: 16,
   },

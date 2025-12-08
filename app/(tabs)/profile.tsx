@@ -11,6 +11,7 @@ import { getUserLikedEvents, getUserFavoritedEvents } from "../../src/services/i
 import { getEventsByIds } from "../../src/services/eventsService";
 import EventCard from "../event-card";
 import { useFocusEffect } from "expo-router";
+import { useAppTheme, LightThemeColors } from "../../src/ThemeContext";
 
 type ProfileEvent = {
   id: string;
@@ -28,6 +29,9 @@ type ProfileEvent = {
 
 const Profile = () => {
   const { user, profile, loading } = useAuthUser();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
   const [clubs, setClubs] = useState<Club[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [likedEvents, setLikedEvents] = useState<ProfileEvent[]>([]);
@@ -121,27 +125,27 @@ const Profile = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView 
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
       {/* Header */}
       <View style={styles.headerSection}>
-        <Text style={styles.header}>Profile</Text>
-        <Text style={styles.subheader}>Manage your account and preferences</Text>
+        <Text style={[styles.header, { color: colors.text }]}>Profile</Text>
+        <Text style={[styles.subheader, { color: colors.subtitle }]}>Manage your account and preferences</Text>
       </View>
 
       {/* Profile Card */}
-      <View style={styles.profileBox}>
-        <View style={styles.avatar}>
+      <View style={[styles.profileBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
           <Text style={styles.avatarText}>
             {profile?.name ? profile.name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase() || "?"}
           </Text>
         </View>
         <View style={styles.info}>
-          <Text style={styles.name}>{profile?.name || user?.displayName || "Unknown User"}</Text>
-          <Text style={styles.email}>{profile?.email || user?.email}</Text>
+          <Text style={[styles.name, { color: colors.text }]}>{profile?.name || user?.displayName || "Unknown User"}</Text>
+          <Text style={[styles.email, { color: colors.subtitle }]}>{profile?.email || user?.email}</Text>
           {profile && (
             <View style={styles.roleContainer}>
               <View style={[
@@ -159,35 +163,35 @@ const Profile = () => {
 
       {/* My Events Section */}
       {user && (
-        <View style={styles.eventsSection}>
-          <Text style={styles.sectionTitle}>My Events</Text>
+        <View style={[styles.eventsSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>My Events</Text>
           
           {/* Tab Selector */}
-          <View style={styles.tabContainer}>
+          <View style={[styles.tabContainer, { backgroundColor: isDark ? colors.border : "#F3F4F6" }]}>
             <TouchableOpacity
-              style={[styles.tab, activeTab === 'liked' && styles.activeTab]}
+              style={[styles.tab, activeTab === 'liked' && [styles.activeTab, { backgroundColor: colors.card }]]}
               onPress={() => setActiveTab('liked')}
             >
               <Ionicons 
                 name={activeTab === 'liked' ? "heart" : "heart-outline"} 
                 size={18} 
-                color={activeTab === 'liked' ? "#EF4444" : "#6B7280"} 
+                color={activeTab === 'liked' ? "#EF4444" : colors.subtitle} 
               />
-              <Text style={[styles.tabText, activeTab === 'liked' && styles.activeTabText]}>
+              <Text style={[styles.tabText, { color: colors.subtitle }, activeTab === 'liked' && [styles.activeTabText, { color: colors.text }]]}>
                 Liked ({likedEvents.length})
               </Text>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.tab, activeTab === 'favorited' && styles.activeTab]}
+              style={[styles.tab, activeTab === 'favorited' && [styles.activeTab, { backgroundColor: colors.card }]]}
               onPress={() => setActiveTab('favorited')}
             >
               <Ionicons 
                 name={activeTab === 'favorited' ? "bookmark" : "bookmark-outline"} 
                 size={18} 
-                color={activeTab === 'favorited' ? "#3B82F6" : "#6B7280"} 
+                color={activeTab === 'favorited' ? "#3B82F6" : colors.subtitle} 
               />
-              <Text style={[styles.tabText, activeTab === 'favorited' && styles.activeTabText]}>
+              <Text style={[styles.tabText, { color: colors.subtitle }, activeTab === 'favorited' && [styles.activeTabText, { color: colors.text }]]}>
                 Favorited ({favoritedEvents.length})
               </Text>
             </TouchableOpacity>
@@ -214,9 +218,9 @@ const Profile = () => {
                   </View>
                 ) : (
                   <View style={styles.emptyState}>
-                    <Ionicons name="heart-outline" size={48} color="#9CA3AF" />
-                    <Text style={styles.emptyText}>No liked events yet</Text>
-                    <Text style={styles.emptySubtext}>Start liking events to see them here</Text>
+                    <Ionicons name="heart-outline" size={48} color={colors.subtitle} />
+                    <Text style={[styles.emptyText, { color: colors.text }]}>No liked events yet</Text>
+                    <Text style={[styles.emptySubtext, { color: colors.subtitle }]}>Start liking events to see them here</Text>
                   </View>
                 )
               ) : (
@@ -233,9 +237,9 @@ const Profile = () => {
                   </View>
                 ) : (
                   <View style={styles.emptyState}>
-                    <Ionicons name="bookmark-outline" size={48} color="#9CA3AF" />
-                    <Text style={styles.emptyText}>No favorited events yet</Text>
-                    <Text style={styles.emptySubtext}>Start favoriting events to see them here</Text>
+                    <Ionicons name="bookmark-outline" size={48} color={colors.subtitle} />
+                    <Text style={[styles.emptyText, { color: colors.text }]}>No favorited events yet</Text>
+                    <Text style={[styles.emptySubtext, { color: colors.subtitle }]}>Start favoriting events to see them here</Text>
                   </View>
                 )
               )}
@@ -245,10 +249,10 @@ const Profile = () => {
       )}
 
       {/* Settings Section */}
-      <View style={styles.settingsBox}>
+      <View style={[styles.settingsBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {/* Notifications toggle */}
-        <View style={styles.row}>
-          <Text style={styles.rowTitle}>Push Notifications</Text>
+        <View style={[styles.row, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.rowTitle, { color: colors.text }]}>Push Notifications</Text>
           <Switch
             value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
@@ -257,29 +261,29 @@ const Profile = () => {
 
         {/* Verify Club Membership */}
         <TouchableOpacity 
-          style={styles.row}
+          style={[styles.row, { borderBottomColor: colors.border }]}
           onPress={() => router.push('/verify-club')}
         >
           <View style={styles.rowContent}>
             <Ionicons name="shield-checkmark" size={20} color="#10B981" />
             <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>Verify Club Membership</Text>
-              <Text style={styles.rowSubtitle}>Join clubs with verification codes</Text>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Verify Club Membership</Text>
+              <Text style={[styles.rowSubtitle, { color: colors.subtitle }]}>Join clubs with verification codes</Text>
             </View>
           </View>
         </TouchableOpacity>
 
         {/* My Club Memberships */}
         {profile?.memberships && profile.memberships.length > 0 && (
-          <View style={styles.membershipsSection}>
-            <Text style={styles.sectionTitle}>My Club Memberships</Text>
+          <View style={[styles.membershipsSection, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>My Club Memberships</Text>
             <View style={styles.clubTagsContainer}>
               {profile.memberships.map((clubSlug) => {
                 const club = clubs.find(c => c.slug === clubSlug);
                 return club ? (
-                  <View key={clubSlug} style={styles.clubTag}>
+                  <View key={clubSlug} style={[styles.clubTag, { borderColor: "#10B981" }]}>
                     <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                    <Text style={styles.clubTagText}>{club.name}</Text>
+                    <Text style={[styles.clubTagText, { color: isDark ? "#10B981" : "#065F46" }]}>{club.name}</Text>
                   </View>
                 ) : null;
               })}
@@ -292,8 +296,8 @@ const Profile = () => {
           style={styles.row}
           onPress={() => router.push("/settings")}
         >
-          <Text style={styles.rowTitle}>Settings</Text>
-          <Text style={styles.rowSubtitle}>App preferences</Text>
+          <Text style={[styles.rowTitle, { color: colors.text }]}>Settings</Text>
+          <Text style={[styles.rowSubtitle, { color: colors.subtitle }]}>App preferences</Text>
         </TouchableOpacity>
       </View>
 
@@ -308,29 +312,25 @@ const Profile = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  container: { flex: 1 },
   contentContainer: { padding: 20, paddingBottom: 120 },
   headerSection: { marginBottom: 24 },
   header: { 
     fontSize: 32, 
     fontWeight: "700",
-    color: "#111827",
     letterSpacing: -0.5,
     marginBottom: 4,
   },
   subheader: { 
     fontSize: 16, 
-    color: "#6B7280",
   },
   profileBox: {
     flexDirection: "row",
     alignItems: "center",
     padding: 24,
     borderRadius: 20,
-    backgroundColor: "#FFFFFF",
     marginBottom: 24,
     borderWidth: 0.5,
-    borderColor: "#F3F4F6",
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 16,
@@ -370,10 +370,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   eventsSection: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     borderWidth: 0.5,
-    borderColor: "#F3F4F6",
     marginBottom: 24,
     padding: 20,
     shadowColor: "#000",
@@ -385,7 +383,6 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
     marginBottom: 16,
-    backgroundColor: "#F3F4F6",
     borderRadius: 8,
     padding: 4,
   },
@@ -400,7 +397,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   activeTab: {
-    backgroundColor: "#fff",
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -409,10 +405,8 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#6B7280",
   },
   activeTabText: {
-    color: "#111827",
     fontWeight: "600",
   },
   eventsList: {
@@ -426,19 +420,15 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#6B7280",
     marginTop: 12,
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#9CA3AF",
     marginTop: 4,
   },
   settingsBox: {
     borderRadius: 20,
-    backgroundColor: "#FFFFFF",
     borderWidth: 0.5,
-    borderColor: "#F3F4F6",
     marginBottom: 24,
     shadowColor: "#000",
     shadowOpacity: 0.04,
@@ -450,17 +440,14 @@ const styles = StyleSheet.create({
   row: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
   },
   rowTitle: { 
     fontSize: 16, 
     fontWeight: "600",
-    color: "#111827",
     marginBottom: 4,
   },
   rowSubtitle: { 
     fontSize: 14, 
-    color: "#6B7280",
   },
   button: {
     backgroundColor: "#EF4444",
@@ -507,12 +494,10 @@ const styles = StyleSheet.create({
   membershipsSection: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#111827",
     marginBottom: 12,
   },
   clubTagsContainer: {
@@ -525,14 +510,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#F0FDF4",
     borderWidth: 1,
-    borderColor: "#10B981",
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   clubTagText: {
     fontSize: 12,
-    color: "#065F46",
     fontWeight: "500",
     marginLeft: 4,
   },

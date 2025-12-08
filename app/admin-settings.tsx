@@ -8,9 +8,13 @@ import { notifyApprovalUpdate } from '../src/lib/notifications';
 import { listClubs, updateClubCodes } from '../src/services/clubsService';
 import { approveEvent, listEvents, rejectEvent } from '../src/services/eventsService';
 import { Club, Event } from '../src/types';
+import { useAppTheme, LightThemeColors } from '../src/ThemeContext';
 
 export default function AdminSettings() {
   const { profile } = useAuthUser();
+  const themeContext = useAppTheme();
+  const colors = themeContext?.colors || LightThemeColors;
+  const isDark = themeContext?.isDark || false;
 
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -119,66 +123,66 @@ export default function AdminSettings() {
 
   if (!profile?.isAdmin) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color="#111827" />
-          <Text style={styles.backText}>Back</Text>
+          <Ionicons name="arrow-back" size={22} color={colors.text} />
+          <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.header}>Admin Settings</Text>
-        <Text>You do not have access to this page.</Text>
+        <Text style={[styles.header, { color: colors.text }]}>Admin Settings</Text>
+        <Text style={{ color: colors.text }}>You do not have access to this page.</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={22} color="#111827" />
-        <Text style={styles.backText}>Back</Text>
+        <Ionicons name="arrow-back" size={22} color={colors.text} />
+        <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
       </TouchableOpacity>
-      <Text style={styles.header}>Admin Settings</Text>
+      <Text style={[styles.header, { color: colors.text }]}>Admin Settings</Text>
 
-      <View style={[styles.card, styles.cardSpacing]}>
-        <Text style={styles.title}>Moderation</Text>
+      <View style={[styles.card, styles.cardSpacing, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Moderation</Text>
         {policyLoading || !policy ? (
-          <ActivityIndicator />
+          <ActivityIndicator color={colors.primary} />
         ) : (
           <>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: colors.subtitle }]}>
               Current mode: {policy.moderationMode === 'off' ? 'Auto-approve' : 'Require approval'}
             </Text>
             <View style={styles.toggleRow}>
               <TouchableOpacity
-                style={[styles.toggleBtn, policy.moderationMode === 'off' && styles.toggleBtnActive]}
+                style={[styles.toggleBtn, { borderColor: colors.border }, policy.moderationMode === 'off' && [styles.toggleBtnActive, { backgroundColor: colors.primary }]]}
                 onPress={() => toggleModeration('off')}
               >
-                <Text style={[styles.toggleText, policy.moderationMode === 'off' && styles.toggleTextActive]}>Auto-approve</Text>
+                <Text style={[styles.toggleText, { color: colors.text }, policy.moderationMode === 'off' && styles.toggleTextActive]}>Auto-approve</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.toggleBtn, policy.moderationMode === 'clubModerator' && styles.toggleBtnActive]}
+                style={[styles.toggleBtn, { borderColor: colors.border }, policy.moderationMode === 'clubModerator' && [styles.toggleBtnActive, { backgroundColor: colors.primary }]]}
                 onPress={() => toggleModeration('clubModerator')}
               >
-                <Text style={[styles.toggleText, policy.moderationMode === 'clubModerator' && styles.toggleTextActive]}>Require approval</Text>
+                <Text style={[styles.toggleText, { color: colors.text }, policy.moderationMode === 'clubModerator' && styles.toggleTextActive]}>Require approval</Text>
               </TouchableOpacity>
             </View>
           </>
         )}
       </View>
 
-      <View style={[styles.card, styles.cardSpacing]}>
-        <Text style={styles.title}>Pending Events</Text>
+      <View style={[styles.card, styles.cardSpacing, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Pending Events</Text>
         {eventsLoading ? (
-          <ActivityIndicator />
+          <ActivityIndicator color={colors.primary} />
         ) : (
           <FlatList
             data={pendingEvents}
             keyExtractor={(item) => item.id}
-            ListEmptyComponent={<Text style={styles.subtitle}>No pending events</Text>}
+            ListEmptyComponent={<Text style={[styles.subtitle, { color: colors.subtitle }]}>No pending events</Text>}
             renderItem={({ item }) => (
               <View style={styles.eventRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.eventTitle}>{item.title}</Text>
-                  <Text style={styles.eventMeta}>{item.clubId} • {new Date(item.dateISO).toLocaleString()}</Text>
+                  <Text style={[styles.eventTitle, { color: colors.text }]}>{item.title}</Text>
+                  <Text style={[styles.eventMeta, { color: colors.subtitle }]}>{item.clubId} • {new Date(item.dateISO).toLocaleString()}</Text>
                 </View>
                 <TouchableOpacity style={[styles.button, styles.approve]} onPress={() => handleApprove(item.id)}>
                   <Text style={styles.buttonText}>Approve</Text>
@@ -192,38 +196,40 @@ export default function AdminSettings() {
         )}
       </View>
 
-      <View style={[styles.card, styles.cardSpacing]}>
-        <Text style={styles.title}>Rotate Club Codes</Text>
+      <View style={[styles.card, styles.cardSpacing, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Rotate Club Codes</Text>
         {clubsLoading ? (
-          <ActivityIndicator />
+          <ActivityIndicator color={colors.primary} />
         ) : (
           <>
             <View style={styles.pillRow}>
               {clubs.map((c) => (
                 <TouchableOpacity
                   key={c.id}
-                  style={[styles.pill, selectedClubId === c.id && styles.pillSelected]}
+                  style={[styles.pill, { borderColor: colors.border }, selectedClubId === c.id && [styles.pillSelected, { backgroundColor: colors.primary }]]}
                   onPress={() => setSelectedClubId(c.id)}
                 >
-                  <Text style={[styles.pillText, selectedClubId === c.id && styles.pillTextSelected]}>{c.name}</Text>
+                  <Text style={[styles.pillText, { color: colors.text }, selectedClubId === c.id && styles.pillTextSelected]}>{c.name}</Text>
                 </TouchableOpacity>
               ))}
             </View>
             <TextInput
               placeholder="New member code (optional)"
+              placeholderTextColor={colors.placeholderText}
               value={newMemberCode}
               onChangeText={setNewMemberCode}
-              style={styles.input}
+              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
               autoCapitalize="none"
             />
             <TextInput
               placeholder="New moderator code (optional)"
+              placeholderTextColor={colors.placeholderText}
               value={newModeratorCode}
               onChangeText={setNewModeratorCode}
-              style={styles.input}
+              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
               autoCapitalize="none"
             />
-            <TouchableOpacity style={[styles.primaryButton, savingCodes && { opacity: 0.7 }]} onPress={handleRotateCodes} disabled={savingCodes}>
+            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }, savingCodes && { opacity: 0.7 }]} onPress={handleRotateCodes} disabled={savingCodes}>
               <Text style={styles.primaryButtonText}>{savingCodes ? 'Saving...' : 'Update Codes'}</Text>
             </TouchableOpacity>
           </>
@@ -236,31 +242,31 @@ export default function AdminSettings() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, padding: 16 },
   backButton: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  backText: { marginLeft: 8, fontSize: 16, color: '#111827' },
+  backText: { marginLeft: 8, fontSize: 16 },
   header: { fontSize: 24, fontWeight: '700', marginVertical: 16 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16 },
+  card: { borderRadius: 12, padding: 16, borderWidth: 1 },
   cardSpacing: { marginBottom: 16 },
   title: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
-  subtitle: { color: '#6b7280' },
+  subtitle: { },
   eventRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   eventTitle: { fontSize: 16, fontWeight: '600' },
-  eventMeta: { color: '#6b7280', fontSize: 12 },
+  eventMeta: { fontSize: 12 },
   button: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8 },
   approve: { backgroundColor: '#10b981' },
   reject: { backgroundColor: '#ef4444' },
   buttonText: { color: '#fff', fontWeight: '600' },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  pill: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 9999, borderWidth: 1, borderColor: '#d1d5db' },
-  pillSelected: { backgroundColor: '#111827', borderColor: '#111827' },
-  pillText: { color: '#111827' },
+  pill: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 9999, borderWidth: 1 },
+  pillSelected: { },
+  pillText: { },
   pillTextSelected: { color: '#fff' },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, marginBottom: 10 },
-  primaryButton: { backgroundColor: '#111827', borderRadius: 10, padding: 12, alignItems: 'center' },
+  input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 10 },
+  primaryButton: { borderRadius: 10, padding: 12, alignItems: 'center' },
   primaryButtonText: { color: '#fff', fontWeight: '700' },
   toggleRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  toggleBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#d1d5db' },
-  toggleBtnActive: { backgroundColor: '#111827', borderColor: '#111827' },
-  toggleText: { color: '#111827', fontWeight: '600' },
+  toggleBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
+  toggleBtnActive: { },
+  toggleText: { fontWeight: '600' },
   toggleTextActive: { color: '#fff' },
 });
 
