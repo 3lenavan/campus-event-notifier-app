@@ -51,7 +51,13 @@ export default function UpdateEmail() {
       await updateEmail(user, newEmail.trim());
 
       Alert.alert("Success", "Email updated!", [
-        { text: "OK", onPress: () => router.back() },
+        { text: "OK", onPress: () => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/settings');
+          }
+        }},
       ]);
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to update email.");

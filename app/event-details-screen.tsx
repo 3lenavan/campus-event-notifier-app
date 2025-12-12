@@ -28,12 +28,14 @@ import {
 import { Club, getClubByIdSupabase } from "../data/dataLoader";
 import { auth, db } from "../src/lib/firebase";
 import { notifyRSVPConfirmation } from "../src/lib/notifications";
-import { listApprovedEvents } from "../src/services/eventsService";
+import { listApprovedEvents, getEventById } from "../src/services/eventsService";
 import {
   getEventLikeCount,
   getEventsInteractions,
   toggleFavorite as toggleFavoriteService,
-  toggleLike as toggleLikeService
+  toggleLike as toggleLikeService,
+  toggleRSVP as toggleRSVPService,
+  isEventRSVPd
 } from "../src/services/interactionsService";
 import { useAppTheme, LightThemeColors } from "../src/ThemeContext";
 
@@ -52,6 +54,7 @@ interface Event {
   isUserAttending?: boolean;
   organizer?: string;
   fullDescription?: string;
+  status?: "pending" | "approved" | "rejected";
 }
 
 // Main Component
@@ -67,6 +70,7 @@ export default function EventDetails() {
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
   const [favorited, setFavorited] = useState(false);
+  const [rsvped, setRsvped] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [club, setClub] = useState<Club | null>(null);
 
@@ -82,9 +86,9 @@ export default function EventDetails() {
     const fetchEvent = async () => {
       try {
         setLoading(true);
-        // Try to get event from local storage first (since eventsService uses local storage)
-        const approvedEvents = await listApprovedEvents();
-        const foundEvent = approvedEvents.find(e => e.id === id);
+        
+        // First try to get the event by ID directly (works for both approved and pending events)
+        const foundEvent = await getEventById(id);
         
         if (foundEvent) {
           const date = new Date(foundEvent.dateISO);
@@ -96,12 +100,13 @@ export default function EventDetails() {
             time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
             location: foundEvent.location,
             category: "Club Event",
-            attendees: 0,
+            attendees: foundEvent.attendees || 0,
             maxAttendees: undefined,
             imageUrl: foundEvent.imageUrl,
             isUserAttending: false,
             organizer: undefined,
             fullDescription: foundEvent.description,
+            status: foundEvent.status,
           };
           setEvent(eventData);
           
@@ -114,15 +119,62 @@ export default function EventDetails() {
               console.error("Error fetching club:", error);
             }
           }
-        } else {
-          // Fallback to Firestore if not found in local storage
-          const docRef = doc(db, "events", id as string);
-          const docSnap = await getDoc(docRef);
 
-          if (docSnap.exists()) {
-            setEvent({ ...(docSnap.data() as Event), id: docSnap.id });
+          // Load RSVP status if user is logged in (only for approved events)
+          if (currentUser?.uid && foundEvent.status === 'approved') {
+            const isRSVPd = await isEventRSVPd(currentUser.uid, foundEvent.id);
+            setRsvped(isRSVPd);
+            setEvent(prev => prev ? { ...prev, isUserAttending: isRSVPd } : prev);
+          }
+        } else {
+          // Fallback: Try approved events list (for backward compatibility)
+          const approvedEvents = await listApprovedEvents();
+          const fallbackEvent = approvedEvents.find(e => e.id === id);
+          
+          if (fallbackEvent) {
+            const date = new Date(fallbackEvent.dateISO);
+            const eventData: Event = {
+              id: fallbackEvent.id,
+              title: fallbackEvent.title,
+              description: fallbackEvent.description,
+              date: date.toISOString().split('T')[0],
+              time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+              location: fallbackEvent.location,
+              category: "Club Event",
+              attendees: fallbackEvent.attendees || 0,
+              maxAttendees: undefined,
+              imageUrl: fallbackEvent.imageUrl,
+              isUserAttending: false,
+              organizer: undefined,
+              fullDescription: fallbackEvent.description,
+              status: fallbackEvent.status,
+            };
+            setEvent(eventData);
+            
+            if (fallbackEvent.clubId) {
+              try {
+                const clubData = await getClubByIdSupabase(Number(fallbackEvent.clubId));
+                setClub(clubData);
+              } catch (error) {
+                console.error("Error fetching club:", error);
+              }
+            }
+
+            if (currentUser?.uid) {
+              const isRSVPd = await isEventRSVPd(currentUser.uid, fallbackEvent.id);
+              setRsvped(isRSVPd);
+              setEvent(prev => prev ? { ...prev, isUserAttending: isRSVPd } : prev);
+            }
           } else {
-            console.log("No such event!");
+            // Last fallback to Firestore if not found in Supabase
+            const docRef = doc(db, "events", id as string);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+              setEvent({ ...(docSnap.data() as Event), id: docSnap.id });
+            } else {
+              console.log("No such event!");
+            }
           }
         }
       } catch (error) {
@@ -132,9 +184,9 @@ export default function EventDetails() {
       }
     };
     fetchEvent();
-  }, [id]);
+  }, [id, currentUser?.uid]);
 
-  // Load like/favorite status when event or user changes
+  // Load like/favorite/RSVP status when event or user changes
   useEffect(() => {
     const loadInteractions = async () => {
       if (!event?.id) return;
@@ -144,13 +196,17 @@ export default function EventDetails() {
           const interactions = await getEventsInteractions(currentUser.uid, [event.id]);
           setLiked(interactions.likedEvents.has(event.id));
           setFavorited(interactions.favoritedEvents.has(event.id));
+          setRsvped(interactions.rsvpedEvents.has(event.id));
           setLikeCount(interactions.likeCounts[event.id] || 0);
+          // Update event state to reflect RSVP status
+          setEvent(prev => prev ? { ...prev, isUserAttending: interactions.rsvpedEvents.has(event.id) } : null);
         } else {
           // Still get like count even if not logged in
           const count = await getEventLikeCount(event.id);
           setLikeCount(count);
           setLiked(false);
           setFavorited(false);
+          setRsvped(false);
         }
       } catch (error) {
         console.error("Error loading interactions:", error);
@@ -196,7 +252,7 @@ export default function EventDetails() {
     }
   };
 
-  // Handle RSVP
+  // Handle RSVP Toggle
   const handleRSVP = async (eventId: string, eventTitle: string) => {
     try {
       if (!currentUser) {
@@ -204,24 +260,31 @@ export default function EventDetails() {
         return;
       }
 
-      await setDoc(doc(db, "rsvps", `${currentUser.uid}_${eventId}`), {
-        userId: currentUser.uid,
-        eventId: eventId,
-        timestamp: serverTimestamp(),
-      });
+      const newRSVPState = await toggleRSVPService(currentUser.uid, eventId);
+      setRsvped(newRSVPState);
+      setEvent(prev => prev ? { ...prev, isUserAttending: newRSVPState } : null);
 
-      await addDoc(collection(db, "notifications"), {
-        userId: currentUser.uid,
-        message: `You RSVP'd for ${eventTitle}!`,
-        timestamp: serverTimestamp(),
-        read: false,
-      });
-
-      alert(`You have RSVP'd for "${eventTitle}" successfully!`);
-      try { await notifyRSVPConfirmation(eventTitle); } catch {}
+      if (newRSVPState) {
+        // RSVP'd successfully
+        try { 
+          await notifyRSVPConfirmation(eventTitle);
+          await addDoc(collection(db, "notifications"), {
+            userId: currentUser.uid,
+            message: `You RSVP'd for ${eventTitle}!`,
+            timestamp: serverTimestamp(),
+            read: false,
+          });
+        } catch {}
+      } else {
+        // Canceled RSVP
+        alert(`RSVP canceled for "${eventTitle}"`);
+      }
     } catch (error) {
-      console.error("Error RSVPing:", error);
+      console.error("Error toggling RSVP:", error);
       alert("Something went wrong. Please try again.");
+      // Revert optimistic update
+      setRsvped(!rsvped);
+      setEvent(prev => prev ? { ...prev, isUserAttending: !prev.isUserAttending } : null);
     }
   };
 
@@ -457,7 +520,13 @@ export default function EventDetails() {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Text style={[styles.notFoundText, { color: colors.text }]}>Event not found</Text>
-        <TouchableOpacity onPress={() => router.back()} style={[styles.backButtonText, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(tabs)/home');
+          }
+        }} style={[styles.backButtonText, { backgroundColor: colors.primary }]}>
           <Text style={styles.backButtonTextLabel}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -510,7 +579,13 @@ export default function EventDetails() {
           {/* Header Overlay */}
           <View style={styles.heroHeader}>
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)/home');
+                }
+              }}
               style={styles.backButton}
               activeOpacity={0.8}
             >
@@ -611,20 +686,27 @@ export default function EventDetails() {
             </TouchableOpacity>
           </View>
 
-          {/* RSVP Button */}
-          {isEventPast ? (
-            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border }]}>
+          {/* RSVP Button - Only show for approved events */}
+          {event.status && event.status !== 'approved' ? (
+            <View style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="time-outline" size={20} color={colors.subtitle} />
+              <Text style={[styles.primaryButtonText, { color: colors.subtitle, marginLeft: 8 }]}>
+                {event.status === 'pending' ? 'Event Pending Approval' : 'Event Not Available'}
+              </Text>
+            </View>
+          ) : isEventPast ? (
+            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border }]} disabled>
               <Text style={styles.primaryButtonText}>Event has ended</Text>
             </TouchableOpacity>
-          ) : isEventFull && !event.isUserAttending ? (
-            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border }]}>
+          ) : isEventFull && !rsvped ? (
+            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border }]} disabled>
               <Text style={styles.primaryButtonText}>Event is full</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               style={[
                 styles.primaryButton,
-                { backgroundColor: event.isUserAttending ? colors.border : colors.primary },
+                { backgroundColor: rsvped ? colors.border : colors.primary },
               ]}
               onPress={() => handleRSVP(event.id, event.title)}
               activeOpacity={0.8}
@@ -632,10 +714,10 @@ export default function EventDetails() {
               <Text
                 style={[
                   styles.primaryButtonText,
-                  event.isUserAttending && { color: colors.text },
+                  rsvped && { color: colors.text },
                 ]}
               >
-                {event.isUserAttending ? "Cancel RSVP" : "RSVP to Event"}
+                {rsvped ? "Cancel RSVP" : "RSVP to Event"}
               </Text>
             </TouchableOpacity>
           )}

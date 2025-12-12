@@ -1,14 +1,12 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { SafeAreaView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useAuthUser } from "../src/hooks/useAuthUser";
-import { useAppTheme, LightThemeColors } from "../src/ThemeContext";
+import { LightThemeColors, useAppTheme } from "../src/ThemeContext";
 
 
 export default function Settings() {
   const { profile } = useAuthUser();
   const themeContext = useAppTheme();
-  // Defensive check to ensure colors is always defined
   const colors = themeContext?.colors || LightThemeColors;
   const isDark = themeContext?.isDark || false;
   const toggleTheme = themeContext?.toggleTheme || (() => {});
@@ -21,6 +19,14 @@ export default function Settings() {
         <Text style={[styles.title, { color: colors.text }]}>Dark Mode</Text>
         <Switch value={isDark} onValueChange={toggleTheme} />
       </View>
+
+      <TouchableOpacity
+        style={[styles.card, styles.cardSpacing, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onPress={() => router.push("/update-email")}
+      >
+        <Text style={[styles.title, { color: colors.text }]}>Update Email</Text>
+        <Text style={[styles.subtitle, { color: colors.subtitle }]}>Change your account email</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.card, styles.cardSpacing, { backgroundColor: colors.card, borderColor: colors.border }]}

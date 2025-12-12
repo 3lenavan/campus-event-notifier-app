@@ -40,20 +40,39 @@ export default function HomeScreen() {
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadApproved = useCallback(async () => {
+  const loadApproved = useCallback(async (forceRefresh: boolean = false) => {
     try {
-      const approved = await listApprovedEvents();
+      console.log('🔄 Loading approved events...', { forceRefresh });
+      const approved = await listApprovedEvents(forceRefresh);
+      console.log('📋 Loaded events:', approved.length, approved);
       const clubs = await listClubs();
       
       // Get current date/time to filter out past events
       const now = new Date();
+      console.log('⏰ Current time:', now.toISOString());
+      
+      // Debug: Log all approved events before filtering
+      console.log('📅 Approved events before date filter:', approved.map(e => ({
+        id: e.id,
+        title: e.title,
+        dateISO: e.dateISO,
+        status: e.status
+      })));
+      console.log('⏰ Current time for filtering:', now.toISOString());
       
       // Map events to FeedEvent format and filter out past events
+      // Only show events that are in the future (time hasn't passed)
       const eventsMapped: FeedEvent[] = approved
         .filter((event) => {
-          // Only include events that haven't passed yet
           const eventDate = new Date(event.dateISO);
-          return eventDate >= now;
+          const isFuture = eventDate > now; // Use > instead of >= to exclude events that have already started
+          
+          if (!isFuture) {
+            console.log('⏭️ Filtered out past event:', event.title, eventDate.toISOString(), 'vs', now.toISOString());
+          } else {
+            console.log('✅ Keeping future event:', event.title, eventDate.toISOString());
+          }
+          return isFuture;
         })
         .map((event) => {
           const date = new Date(event.dateISO);
@@ -65,7 +84,7 @@ export default function HomeScreen() {
             time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
             location: event.location,
             category: "Club Event",
-            attendees: 0,
+            attendees: event.attendees || 0,
             maxAttendees: undefined,
             imageUrl: event.imageUrl,
             isUserAttending: false,
@@ -90,14 +109,14 @@ export default function HomeScreen() {
         });
       }
 
+      console.log('✅ Setting events:', eventsMapped.length);
       setEvents(eventsMapped);
     } catch (e) {
-      console.error("Error loading approved events:", e);
+      console.error("❌ Error loading approved events:", e);
     }
   }, [user]);
 
-  useEffect(() => { loadApproved(); }, [loadApproved]);
-  useFocusEffect(useCallback(() => { loadApproved(); }, [loadApproved]));
+  useEffect(() => { loadApproved(true); }, [loadApproved]);
 
   const onPressEvent = useCallback((event: BaseEvent) => {
     router.push({ pathname: "/event-details-screen", params: { id: event.id } });
@@ -209,8 +228,24 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadApproved().finally(() => setRefreshing(false));
+    loadApproved(true).finally(() => setRefreshing(false));
   }, [loadApproved]);
+
+  // Force refresh when screen is focused (important for newly created events)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('👁️ Home screen focused, refreshing events...');
+      // Longer delay to ensure database has committed any recent changes
+      const timer = setTimeout(() => {
+        console.log('🔄 Executing delayed refresh...');
+        loadApproved(true);
+      }, 600);
+      return () => {
+        console.log('🧹 Cleaning up focus effect timer');
+        clearTimeout(timer);
+      };
+    }, [loadApproved])
+  );
 
   const getUserGreeting = () => {
     if (!profile?.name && !user?.displayName) {

@@ -124,7 +124,13 @@ export default function AdminSettings() {
   if (!profile?.isAdmin) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/settings');
+          }
+        }}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
           <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
         </TouchableOpacity>
@@ -136,7 +142,13 @@ export default function AdminSettings() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => router.back()}>
+      <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/settings');
+        }
+      }}>
         <Ionicons name="arrow-back" size={22} color={colors.text} />
         <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
       </TouchableOpacity>

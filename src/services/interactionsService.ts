@@ -157,6 +157,131 @@ export const toggleFavorite = async (userId: string, eventId: string): Promise<b
   }
 };
 
+// SUPABASE RSVPs
+export const rsvpToEvent = async (userId: string, eventId: string): Promise<void> => {
+  const { error } = await supabase.from("event_rsvp").insert({
+    firebase_uid: userId,
+    event_id: eventId,
+  });
+
+  if (error) {
+    console.error("Error RSVPing to event:", error);
+    throw error;
+  }
+};
+
+export const cancelRSVP = async (userId: string, eventId: string): Promise<void> => {
+  const { error } = await supabase
+    .from("event_rsvp")
+    .delete()
+    .eq("firebase_uid", userId)
+    .eq("event_id", eventId);
+
+  if (error) {
+    console.error("Error canceling RSVP:", error);
+    throw error;
+  }
+};
+
+export const isEventRSVPd = async (userId: string, eventId: string): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from("event_rsvp")
+    .select("id")
+    .eq("firebase_uid", userId)
+    .eq("event_id", eventId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error checking RSVP:", error);
+    return false;
+  }
+
+  return !!data;
+};
+
+export const getUserRSVPdEvents = async (userId: string): Promise<string[]> => {
+  const { data, error } = await supabase
+    .from("event_rsvp")
+    .select("event_id")
+    .eq("firebase_uid", userId);
+
+  if (error) {
+    console.error("Error getting RSVP'd events:", error);
+    return [];
+  }
+
+  return data.map((row) => row.event_id.toString());
+};
+
+export const toggleRSVP = async (userId: string, eventId: string): Promise<boolean> => {
+  const isRSVPd = await isEventRSVPd(userId, eventId);
+
+  if (isRSVPd) {
+    await cancelRSVP(userId, eventId);
+    return false;
+  } else {
+    await rsvpToEvent(userId, eventId);
+    return true;
+  }
+};
+
+/**
+ * Get attendee counts for multiple events
+ * Returns a map of eventId -> attendee count
+ */
+export const getEventAttendeeCounts = async (eventIds: string[]): Promise<Record<string, number>> => {
+  if (eventIds.length === 0) return {};
+
+  try {
+    // Convert string IDs to numbers
+    const numericIds = eventIds
+      .map(id => {
+        const num = parseInt(id);
+        return isNaN(num) ? null : num;
+      })
+      .filter((id): id is number => id !== null);
+
+    if (numericIds.length === 0) return {};
+
+    // Query all RSVPs for these events
+    const { data, error } = await supabase
+      .from('event_rsvp')
+      .select('event_id')
+      .in('event_id', numericIds);
+
+    if (error) {
+      console.error('Error getting attendee counts:', error);
+      return {};
+    }
+
+    // Count RSVPs per event
+    const counts: Record<string, number> = {};
+    eventIds.forEach(id => counts[id] = 0); // Initialize all to 0
+    
+    if (data) {
+      data.forEach((row: any) => {
+        const eventId = String(row.event_id);
+        if (counts.hasOwnProperty(eventId)) {
+          counts[eventId] = (counts[eventId] || 0) + 1;
+        }
+      });
+    }
+
+    return counts;
+  } catch (error) {
+    console.error('Error getting attendee counts:', error);
+    return {};
+  }
+};
+
+/**
+ * Get attendee count for a single event
+ */
+export const getEventAttendeeCount = async (eventId: string): Promise<number> => {
+  const counts = await getEventAttendeeCounts([eventId]);
+  return counts[eventId] || 0;
+};
+
 // Combined Loader (Home + Discover + Profile use this)
 export const getEventsInteractions = async (
   userId: string,
@@ -164,10 +289,12 @@ export const getEventsInteractions = async (
 ): Promise<{
   likedEvents: Set<string>;
   favoritedEvents: Set<string>;
+  rsvpedEvents: Set<string>;
   likeCounts: Record<string, number>;
 }> => {
   const likedEvents = new Set<string>();
   const favoritedEvents = new Set<string>();
+  const rsvpedEvents = new Set<string>();
   const likeCounts: Record<string, number> = {};
 
   // Initialize like counts
@@ -186,5 +313,9 @@ export const getEventsInteractions = async (
   const favorites = await getUserFavoritedEvents(userId);
   favorites.forEach((id) => favoritedEvents.add(id.toString()));
 
-  return { likedEvents, favoritedEvents, likeCounts };
+  // Load RSVPs from Supabase
+  const rsvps = await getUserRSVPdEvents(userId);
+  rsvps.forEach((id) => rsvpedEvents.add(id.toString()));
+
+  return { likedEvents, favoritedEvents, rsvpedEvents, likeCounts };
 };

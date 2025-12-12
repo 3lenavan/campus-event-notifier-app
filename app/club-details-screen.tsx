@@ -162,7 +162,13 @@ export default function ClubDetails() {
         <Text style={[styles.notFound, { color: colors.text }]}>Club not found.</Text>
         <TouchableOpacity 
           style={[styles.backButtonText, { backgroundColor: colors.primary }]} 
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/discover');
+            }
+          }}
           activeOpacity={0.8}
         >
           <Text style={styles.backButtonTextLabel}>Go Back</Text>
@@ -196,7 +202,13 @@ export default function ClubDetails() {
             <View style={styles.heroHeader}>
               <TouchableOpacity 
                 style={styles.backButtonOverlay} 
-                onPress={() => router.back()}
+                onPress={() => {
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace('/(tabs)/discover');
+                  }
+                }}
                 activeOpacity={0.8}
               >
                 <Ionicons name="arrow-back" size={24} color="#FFFFFF" />

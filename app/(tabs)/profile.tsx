@@ -7,7 +7,7 @@ import { useAuthUser } from "../../src/hooks/useAuthUser";
 import { auth } from "../../src/lib/firebase";
 import { listClubs } from "../../src/services/clubsService";
 import { Club, Event } from "../../src/types";
-import { getUserLikedEvents, getUserFavoritedEvents } from "../../src/services/interactionsService";
+import { getUserLikedEvents, getUserFavoritedEvents, getUserRSVPdEvents } from "../../src/services/interactionsService";
 import { getEventsByIds } from "../../src/services/eventsService";
 import EventCard from "../event-card";
 import { useFocusEffect } from "expo-router";
@@ -36,8 +36,9 @@ const Profile = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [likedEvents, setLikedEvents] = useState<ProfileEvent[]>([]);
   const [favoritedEvents, setFavoritedEvents] = useState<ProfileEvent[]>([]);
+  const [rsvpedEvents, setRsvpedEvents] = useState<ProfileEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
-  const [activeTab, setActiveTab] = useState<'liked' | 'favorited'>('liked');
+  const [activeTab, setActiveTab] = useState<'liked' | 'favorited' | 'rsvped'>('liked');
 
   useEffect(() => {
     const loadClubs = async () => {
@@ -61,20 +62,23 @@ const Profile = () => {
     try {
       setLoadingEvents(true);
       
-      // Fetch liked and favorited event IDs
-      const [likedEventIds, favoritedEventIds] = await Promise.all([
+      // Fetch liked, favorited, and RSVP'd event IDs
+      const [likedEventIds, favoritedEventIds, rsvpedEventIds] = await Promise.all([
         getUserLikedEvents(user.uid),
         getUserFavoritedEvents(user.uid),
+        getUserRSVPdEvents(user.uid),
       ]);
 
       // Fetch actual event data
-      const [likedEventsData, favoritedEventsData] = await Promise.all([
+      const [likedEventsData, favoritedEventsData, rsvpedEventsData] = await Promise.all([
         getEventsByIds(likedEventIds),
         getEventsByIds(favoritedEventIds),
+        getEventsByIds(rsvpedEventIds),
       ]);
 
       // Convert to ProfileEvent format
       const clubsData = await listClubs();
+      const now = new Date();
       
       const convertToProfileEvent = (event: Event): ProfileEvent => {
         const date = new Date(event.dateISO);
@@ -86,15 +90,24 @@ const Profile = () => {
           time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
           location: event.location,
           category: "Club Event",
-          attendees: 0,
+          attendees: event.attendees || 0,
           maxAttendees: undefined,
-          imageUrl: undefined,
+          imageUrl: event.imageUrl,
           isUserAttending: false,
         };
       };
 
+      // Filter out past events for RSVP'd events only
+      const filteredRSVPedEvents = rsvpedEventsData
+        .filter((event) => {
+          const eventDate = new Date(event.dateISO);
+          return eventDate >= now;
+        })
+        .map(convertToProfileEvent);
+
       setLikedEvents(likedEventsData.map(convertToProfileEvent));
       setFavoritedEvents(favoritedEventsData.map(convertToProfileEvent));
+      setRsvpedEvents(filteredRSVPedEvents);
     } catch (error) {
       console.error('Error loading user events:', error);
     } finally {
@@ -177,7 +190,7 @@ const Profile = () => {
                 size={18} 
                 color={activeTab === 'liked' ? "#EF4444" : colors.subtitle} 
               />
-              <Text style={[styles.tabText, { color: colors.subtitle }, activeTab === 'liked' && [styles.activeTabText, { color: colors.text }]]}>
+              <Text style={[styles.tabText, { color: colors.subtitle }, activeTab === 'liked' && [styles.activeTabText, { color: colors.text }]]} numberOfLines={1}>
                 Liked ({likedEvents.length})
               </Text>
             </TouchableOpacity>
@@ -191,8 +204,22 @@ const Profile = () => {
                 size={18} 
                 color={activeTab === 'favorited' ? "#3B82F6" : colors.subtitle} 
               />
-              <Text style={[styles.tabText, { color: colors.subtitle }, activeTab === 'favorited' && [styles.activeTabText, { color: colors.text }]]}>
-                Favorited ({favoritedEvents.length})
+              <Text style={[styles.tabText, { color: colors.subtitle }, activeTab === 'favorited' && [styles.activeTabText, { color: colors.text }]]} numberOfLines={1}>
+                Saved ({favoritedEvents.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'rsvped' && [styles.activeTab, { backgroundColor: colors.card }]]}
+              onPress={() => setActiveTab('rsvped')}
+            >
+              <Ionicons 
+                name={activeTab === 'rsvped' ? "calendar" : "calendar-outline"} 
+                size={18} 
+                color={activeTab === 'rsvped' ? "#10B981" : colors.subtitle} 
+              />
+              <Text style={[styles.tabText, { color: colors.subtitle }, activeTab === 'rsvped' && [styles.activeTabText, { color: colors.text }]]} numberOfLines={1}>
+                RSVP'd ({rsvpedEvents.length})
               </Text>
             </TouchableOpacity>
           </View>
@@ -200,7 +227,7 @@ const Profile = () => {
           {/* Events List */}
           {loadingEvents ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>Loading events...</Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>Loading events...</Text>
             </View>
           ) : (
             <>
@@ -223,7 +250,7 @@ const Profile = () => {
                     <Text style={[styles.emptySubtext, { color: colors.subtitle }]}>Start liking events to see them here</Text>
                   </View>
                 )
-              ) : (
+              ) : activeTab === 'favorited' ? (
                 favoritedEvents.length > 0 ? (
                   <View style={styles.eventsList}>
                     {favoritedEvents.map((event) => (
@@ -240,6 +267,25 @@ const Profile = () => {
                     <Ionicons name="bookmark-outline" size={48} color={colors.subtitle} />
                     <Text style={[styles.emptyText, { color: colors.text }]}>No favorited events yet</Text>
                     <Text style={[styles.emptySubtext, { color: colors.subtitle }]}>Start favoriting events to see them here</Text>
+                  </View>
+                )
+              ) : (
+                rsvpedEvents.length > 0 ? (
+                  <View style={styles.eventsList}>
+                    {rsvpedEvents.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        onPress={() => router.push({ pathname: "/event-details-screen", params: { id: event.id } })}
+                        compact={true}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="calendar-outline" size={48} color={colors.subtitle} />
+                    <Text style={[styles.emptyText, { color: colors.text }]}>No RSVP'd events yet</Text>
+                    <Text style={[styles.emptySubtext, { color: colors.subtitle }]}>RSVP to events to see them here</Text>
                   </View>
                 )
               )}
@@ -392,9 +438,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     borderRadius: 6,
-    gap: 6,
+    gap: 4,
   },
   activeTab: {
     shadowColor: "#000",
@@ -403,7 +449,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "500",
   },
   activeTabText: {

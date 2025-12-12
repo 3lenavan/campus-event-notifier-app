@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -27,6 +27,133 @@ import { useAppTheme, LightThemeColors } from '../ThemeContext';
 // Updated import to use rewritten image picker and uploader
 import { pickImage, uploadEventImage } from '../services/imageUploadService';
 
+// Web HTML5 input component - renders native HTML inputs for web
+const WebDateInput: React.FC<{
+  id: string;
+  type: 'date' | 'time';
+  value: string;
+  min?: string;
+  onChange: (value: string) => void;
+  colors: any;
+}> = ({ id, type, value, min, onChange, colors }) => {
+  const containerRef = useRef<View>(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const setupInput = () => {
+        // @ts-ignore - React Native Web allows DOM access
+        const container = containerRef.current?._nativeNode || 
+                         (typeof document !== 'undefined' ? document.getElementById(`container-${id}`) : null);
+        
+        if (!container) return;
+
+        // Remove existing input if any
+        const existing = container.querySelector('input');
+        if (existing) {
+          existing.remove();
+        }
+
+        // Create new input element
+        const input = document.createElement('input');
+        input.type = type;
+        input.id = id;
+        input.value = value;
+        if (min && type === 'date') input.min = min;
+        
+        // Apply styles with dark text color for visibility
+        // Ensure text is always visible - use dark color unless in dark mode
+        const textColor = isDark ? colors.text : (colors.text === '#FFFFFF' || colors.text === '#fff' || !colors.text || colors.text === colors.inputBackground ? '#000000' : colors.text);
+        input.style.cssText = `
+          width: 100%;
+          padding: 12px;
+          border-radius: 8px;
+          border: 1px solid ${colors.border};
+          background-color: ${colors.inputBackground};
+          color: ${textColor};
+          font-size: 16px;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          box-sizing: border-box;
+          cursor: pointer;
+          outline: none;
+          -webkit-appearance: none;
+          -moz-appearance: textfield;
+        `;
+        
+        // Add focus styles
+        input.addEventListener('focus', () => {
+          input.style.borderColor = colors.primary;
+          input.style.boxShadow = `0 0 0 3px ${colors.primary}33`;
+        });
+        
+        input.addEventListener('blur', () => {
+          input.style.borderColor = colors.border;
+          input.style.boxShadow = 'none';
+        });
+        
+        // Handle change
+        const handleChange = (e: Event) => {
+          const target = e.target as HTMLInputElement;
+          if (target.value) {
+            onChange(target.value);
+          }
+        };
+        
+        input.addEventListener('change', handleChange);
+        
+        // Append to container
+        if (container.appendChild) {
+          container.appendChild(input);
+        } else if (container.parentNode) {
+          container.parentNode.insertBefore(input, container.nextSibling);
+        }
+      };
+
+      // Setup after render - use requestAnimationFrame for better timing
+      const setup = () => {
+        requestAnimationFrame(() => {
+          setupInput();
+        });
+      };
+      
+      const timer = setTimeout(setup, 100);
+      
+      // Also update value when it changes
+      const valueUpdateTimer = setInterval(() => {
+        const input = document.getElementById(id) as HTMLInputElement;
+        if (input && input.value !== value) {
+          input.value = value;
+        }
+      }, 200);
+
+      return () => {
+        clearTimeout(timer);
+        clearInterval(valueUpdateTimer);
+      };
+    }
+  }, [id, type, value, min, onChange, colors]);
+
+  // Separate effect to update value without recreating the element
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const input = document.getElementById(id) as HTMLInputElement;
+      if (input && input.value !== value) {
+        input.value = value;
+      }
+    }
+  }, [id, value]);
+
+  if (Platform.OS !== 'web') return null;
+
+  return (
+    <View 
+      ref={containerRef}
+      style={{ minHeight: 44, width: '100%' }}
+      // @ts-ignore - React Native Web supports testID which creates an ID
+      testID={`container-${id}`}
+    />
+  );
+};
+
 interface CreateEventProps {
   clubId?: string;
 }
@@ -44,7 +171,14 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [eventDate, setEventDate] = useState(new Date());
+  // Initialize to tomorrow at 12:00 PM to ensure it's always in the future
+  const getDefaultEventDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(12, 0, 0, 0);
+    return tomorrow;
+  };
+  const [eventDate, setEventDate] = useState(getDefaultEventDate());
   const [location, setLocation] = useState('');
   const [locationError, setLocationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,6 +190,97 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Web date/time input refs - use stable IDs
+  const dateInputIdRef = React.useRef(`web-date-input-${Math.random().toString(36).substr(2, 9)}`);
+  const timeInputIdRef = React.useRef(`web-time-input-${Math.random().toString(36).substr(2, 9)}`);
+  
+  // Store stable handler references using useRef
+  const handleDateChangeRef = useRef<((e: Event) => void) | null>(null);
+  const handleTimeChangeRef = useRef<((e: Event) => void) | null>(null);
+
+  // Setup web date/time input event listeners
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      // Setup date input listener
+      const setupDateInput = () => {
+        const dateInput = document.getElementById(dateInputIdRef.current) as HTMLInputElement;
+        if (dateInput) {
+          // Remove old listener if it exists
+          if (handleDateChangeRef.current) {
+            dateInput.removeEventListener('change', handleDateChangeRef.current);
+          }
+          
+          // Create new handler
+          const handleDateChange = (e: Event) => {
+            const target = e.target as HTMLInputElement;
+            if (target.value) {
+              const newDate = new Date(target.value + 'T' + eventDate.toTimeString().slice(0, 5));
+              const now = new Date();
+              if (newDate <= now) {
+                newDate.setDate(now.getDate() + 1);
+              }
+              setEventDate(newDate);
+            }
+          };
+          
+          // Store reference and add listener
+          handleDateChangeRef.current = handleDateChange;
+          dateInput.addEventListener('change', handleDateChange);
+        }
+      };
+
+      // Setup time input listener
+      const setupTimeInput = () => {
+        const timeInput = document.getElementById(timeInputIdRef.current) as HTMLInputElement;
+        if (timeInput) {
+          // Remove old listener if it exists
+          if (handleTimeChangeRef.current) {
+            timeInput.removeEventListener('change', handleTimeChangeRef.current);
+          }
+          
+          // Create new handler
+          const handleTimeChange = (e: Event) => {
+            const target = e.target as HTMLInputElement;
+            if (target.value) {
+              const [hours, minutes] = target.value.split(':');
+              const newDate = new Date(eventDate);
+              newDate.setHours(parseInt(hours, 10));
+              newDate.setMinutes(parseInt(minutes, 10));
+              const now = new Date();
+              if (newDate <= now) {
+                newDate.setDate(newDate.getDate() + 1);
+              }
+              setEventDate(newDate);
+            }
+          };
+          
+          // Store reference and add listener
+          handleTimeChangeRef.current = handleTimeChange;
+          timeInput.addEventListener('change', handleTimeChange);
+        }
+      };
+
+      // Setup after a small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        setupDateInput();
+        setupTimeInput();
+      }, 100);
+
+      return () => {
+        clearTimeout(timer);
+        // Cleanup: remove listeners using stored references
+        const dateInput = document.getElementById(dateInputIdRef.current) as HTMLInputElement;
+        const timeInput = document.getElementById(timeInputIdRef.current) as HTMLInputElement;
+        if (dateInput && handleDateChangeRef.current) {
+          dateInput.removeEventListener('change', handleDateChangeRef.current);
+        }
+        if (timeInput && handleTimeChangeRef.current) {
+          timeInput.removeEventListener('change', handleTimeChangeRef.current);
+        }
+      };
+    }
+  }, [eventDate, Platform.OS]);
 
   useEffect(() => {
     loadClubs();
@@ -176,7 +401,8 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
     }
 
     try {
-      await createEvent(
+      console.log('📝 Creating event...', { title: title.trim(), clubId: selectedClubId, dateISO: eventDate.toISOString() });
+      const newEvent = await createEvent(
         {
           title: title.trim(),
           description: description.trim(),
@@ -187,12 +413,48 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
         },
         user.uid
       );
+      console.log('✅ Event created:', newEvent);
 
-      Alert.alert('Success', 'Event created successfully!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      // Clear form
+      setTitle('');
+      setDescription('');
+      setLocation('');
+      setSelectedImageUri(null);
+      setSelectedImageBase64(null);
+      setValidationErrors([]);
+
+      // Show success message and navigate
+      const message = newEvent.status === 'approved' 
+        ? `"${title.trim()}" has been successfully created and is now visible to everyone!`
+        : `"${title.trim()}" has been created and is pending admin approval.`;
+
+      Alert.alert(
+        'Event Created! ✅', 
+        message,
+        [
+          { 
+            text: 'View Event', 
+            onPress: () => {
+              // Navigate to event details to show the new event immediately
+              router.replace({ pathname: '/event-details-screen', params: { id: newEvent.id } });
+            },
+            style: 'default'
+          },
+          { 
+            text: 'Go to Home', 
+            onPress: async () => {
+              // Navigate to home feed - give it a moment to ensure event is committed
+              await new Promise(resolve => setTimeout(resolve, 600));
+              router.push('/(tabs)/home');
+            },
+            style: 'cancel'
+          }
+        ],
+        { cancelable: false }
+      );
     } catch (error: any) {
       console.error('Error creating event:', error);
+      Alert.alert('Error', error.message || 'Failed to create event. Please try again.');
       setValidationErrors([error.message || 'Failed to create event']);
     } finally {
       setLoading(false);
@@ -296,6 +558,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
           {/* Date and time pickers */}
           <View style={styles.inputContainer}>
             <Text style={[styles.label, { color: colors.text }]}>Date & Time *</Text>
+            {/* Date and time pickers - unified approach for all platforms */}
             <View style={styles.dateTimeContainer}>
               <TouchableOpacity
                 style={[styles.dateTimeButton, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}
@@ -327,46 +590,91 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ clubId }) => {
             </View>
 
             {showDatePicker && (
-              <DateTimePicker
-                value={eventDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, selectedDate) => {
-                  if (Platform.OS === 'android') {
-                    setShowDatePicker(false);
-                  }
-                  if (selectedDate) {
-                    const newDate = new Date(selectedDate);
-                    newDate.setHours(eventDate.getHours());
-                    newDate.setMinutes(eventDate.getMinutes());
-                    setEventDate(newDate);
-                  } else if (Platform.OS === 'android') {
-                    setShowDatePicker(false);
-                  }
-                }}
-                minimumDate={new Date()}
-              />
+              <View style={[
+                Platform.OS === 'ios' ? { 
+                  backgroundColor: colors.card, 
+                  borderRadius: 12,
+                  padding: 8,
+                } : {},
+                Platform.OS === 'web' ? {
+                  backgroundColor: colors.card,
+                  borderRadius: 8,
+                  padding: 12,
+                } : {}
+              ]}>
+                <DateTimePicker
+                  value={eventDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : Platform.OS === 'web' ? 'inline' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    if (Platform.OS === 'android' || Platform.OS === 'web') {
+                      setShowDatePicker(false);
+                    }
+                    if (selectedDate) {
+                      const newDate = new Date(selectedDate);
+                      newDate.setHours(eventDate.getHours());
+                      newDate.setMinutes(eventDate.getMinutes());
+                      // Ensure the date is in the future
+                      const now = new Date();
+                      if (newDate <= now) {
+                        // If date is today or past, set to tomorrow
+                        newDate.setDate(now.getDate() + 1);
+                      }
+                      setEventDate(newDate);
+                    } else if (Platform.OS === 'android' || Platform.OS === 'web') {
+                      setShowDatePicker(false);
+                    }
+                  }}
+                  minimumDate={new Date()}
+                  textColor={isDark ? colors.text : '#0B0C0E'}
+                  themeVariant={isDark ? 'dark' : 'light'}
+                  accentColor={colors.primary}
+                />
+              </View>
             )}
 
             {showTimePicker && (
-              <DateTimePicker
-                value={eventDate}
-                mode="time"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, selectedTime) => {
-                  if (Platform.OS === 'android') {
-                    setShowTimePicker(false);
-                  }
-                  if (selectedTime) {
-                    const newDate = new Date(eventDate);
-                    newDate.setHours(selectedTime.getHours());
-                    newDate.setMinutes(selectedTime.getMinutes());
-                    setEventDate(newDate);
-                  } else if (Platform.OS === 'android') {
-                    setShowTimePicker(false);
-                  }
-                }}
-              />
+              <View style={[
+                Platform.OS === 'ios' ? { 
+                  backgroundColor: colors.card, 
+                  borderRadius: 12,
+                  padding: 8,
+                } : {},
+                Platform.OS === 'web' ? {
+                  backgroundColor: colors.card,
+                  borderRadius: 8,
+                  padding: 12,
+                } : {}
+              ]}>
+                <DateTimePicker
+                  value={eventDate}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : Platform.OS === 'web' ? 'inline' : 'default'}
+                  onChange={(event, selectedTime) => {
+                    if (Platform.OS === 'android' || Platform.OS === 'web') {
+                      setShowTimePicker(false);
+                    }
+                    if (selectedTime) {
+                      const newDate = new Date(eventDate);
+                      const selectedHours = selectedTime.getHours();
+                      const selectedMinutes = selectedTime.getMinutes();
+                      newDate.setHours(selectedHours);
+                      newDate.setMinutes(selectedMinutes);
+                      // If the selected time makes the date in the past, move to next day
+                      const now = new Date();
+                      if (newDate <= now) {
+                        newDate.setDate(newDate.getDate() + 1);
+                      }
+                      setEventDate(newDate);
+                    } else if (Platform.OS === 'android' || Platform.OS === 'web') {
+                      setShowTimePicker(false);
+                    }
+                  }}
+                  textColor={isDark ? colors.text : '#0B0C0E'}
+                  themeVariant={isDark ? 'dark' : 'light'}
+                  accentColor={colors.primary}
+                />
+              </View>
             )}
 
             {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
@@ -489,6 +797,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   textArea: { height: 120, textAlignVertical: 'top' },
+  dateTimeLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 6,
+  },
   dateTimeContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -544,6 +857,11 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#DC2626' },
   errorTextSmall: { fontSize: 12 },
+  helpText: {
+    fontSize: 12,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
   imagePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',

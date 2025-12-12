@@ -34,6 +34,7 @@ export interface Event {
   status: "pending" | "approved" | "rejected";
   moderationNote?: string;
   imageUrl?: string;
+  attendees?: number; // Number of people who RSVP'd to this event
 }
 
 // Service Types

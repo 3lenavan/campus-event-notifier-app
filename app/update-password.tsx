@@ -51,7 +51,13 @@ export default function UpdatePassword() {
       await updatePassword(user, newPassword);
 
       Alert.alert("Password Updated!", "Your password has been updated.", [
-        { text: "OK", onPress: () => router.back() },
+        { text: "OK", onPress: () => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/settings');
+          }
+        }},
       ]);
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to update password.");

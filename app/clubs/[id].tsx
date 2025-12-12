@@ -152,7 +152,13 @@ export default function ClubDetails() {
         <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/discover');
+              }
+            }}
           >
             <Ionicons name="arrow-back" size={22} color={colors.text} />
             <Text style={[styles.backText, { color: colors.text }]}>Back to Discover</Text>

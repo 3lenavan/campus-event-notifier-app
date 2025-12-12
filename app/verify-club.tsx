@@ -7,7 +7,11 @@ export default function VerifyClubPage() {
   return (
     <VerifyClub 
       onSuccess={() => {
-        router.back();
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/(tabs)/profile');
+        }
       }}
     />
   );

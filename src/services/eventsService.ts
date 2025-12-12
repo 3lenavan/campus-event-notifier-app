@@ -1,6 +1,7 @@
 import { getEventPolicy } from '../lib/eventPolicy';
 import { CreateEventInput, Event } from '../types';
 import { supabase } from '../../data/supabaseClient';
+import { getEventAttendeeCounts } from './interactionsService';
 
 /**
  * Get all events sorted by creation date (newest first)
@@ -17,7 +18,7 @@ export const listEvents = async (): Promise<Event[]> => {
       return [];
     }
 
-    return (data || []).map((row: any) => ({
+    const mapped = (data || []).map((row: any) => ({
       id: String(row.id),
       title: row.title,
       description: row.description,
@@ -30,6 +31,16 @@ export const listEvents = async (): Promise<Event[]> => {
       moderationNote: row.moderation_note || undefined,
       imageUrl: row.image_url || undefined,
     }));
+
+    // Get attendee counts for all events
+    const eventIds = mapped.map(e => e.id);
+    const attendeeCounts = await getEventAttendeeCounts(eventIds);
+
+    // Add attendee counts to events
+    return mapped.map(event => ({
+      ...event,
+      attendees: attendeeCounts[event.id] || 0,
+    }));
   } catch (error) {
     console.error('Error listing events:', error);
     return [];
@@ -39,8 +50,29 @@ export const listEvents = async (): Promise<Event[]> => {
 /**
  * Get all approved events sorted by creation date (newest first)
  */
-export const listApprovedEvents = async (): Promise<Event[]> => {
+export const listApprovedEvents = async (forceRefresh: boolean = false): Promise<Event[]> => {
   try {
+    // Always query fresh data - Supabase queries are fresh by default but we can ensure it
+    // by building the query fresh each time
+    console.log('🔍 Querying Supabase for approved events...');
+    
+    // First, let's check ALL events to see what we have
+    const { data: allEvents, error: allError } = await supabase
+      .from('events')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    if (!allError && allEvents) {
+      console.log('📊 All recent events (last 10):', allEvents.map(e => ({
+        id: e.id,
+        title: e.title,
+        status: e.status,
+        date_iso: e.date_iso
+      })));
+    }
+    
+    // Now get only approved events
     const { data, error } = await supabase
       .from('events')
       .select('*')
@@ -48,11 +80,13 @@ export const listApprovedEvents = async (): Promise<Event[]> => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error listing approved events from Supabase:', error);
+      console.error('❌ Error listing approved events from Supabase:', error);
       return [];
     }
 
-    return (data || []).map((row: any) => ({
+    console.log('📊 Raw events from Supabase:', data?.length || 0, data);
+
+    const mapped = (data || []).map((row: any) => ({
       id: String(row.id),
       title: row.title,
       description: row.description,
@@ -65,8 +99,21 @@ export const listApprovedEvents = async (): Promise<Event[]> => {
       moderationNote: row.moderation_note || undefined,
       imageUrl: row.image_url || undefined,
     }));
+
+    // Get attendee counts for all events
+    const eventIds = mapped.map(e => e.id);
+    const attendeeCounts = await getEventAttendeeCounts(eventIds);
+
+    // Add attendee counts to events
+    const eventsWithAttendees = mapped.map(event => ({
+      ...event,
+      attendees: attendeeCounts[event.id] || 0,
+    }));
+
+    console.log('✨ Mapped events:', eventsWithAttendees.length);
+    return eventsWithAttendees;
   } catch (error) {
-    console.error('Error listing approved events:', error);
+    console.error('❌ Error listing approved events:', error);
     return [];
   }
 };
@@ -91,7 +138,7 @@ export const listClubEvents = async (clubId: string): Promise<Event[]> => {
       return [];
     }
 
-    return (data || []).map((row: any) => ({
+    const mapped = (data || []).map((row: any) => ({
       id: String(row.id),
       title: row.title,
       description: row.description,
@@ -103,6 +150,16 @@ export const listClubEvents = async (clubId: string): Promise<Event[]> => {
       status: row.status || 'pending',
       moderationNote: row.moderation_note || undefined,
       imageUrl: row.image_url || undefined,
+    }));
+
+    // Get attendee counts for all events
+    const eventIds = mapped.map(e => e.id);
+    const attendeeCounts = await getEventAttendeeCounts(eventIds);
+
+    // Add attendee counts to events
+    return mapped.map(event => ({
+      ...event,
+      attendees: attendeeCounts[event.id] || 0,
     }));
   } catch (error) {
     console.error('Error listing club events:', error);
@@ -134,16 +191,73 @@ export const getClubEventCount = async (clubId: string | number): Promise<number
 };
 
 /**
+ * Get a single event by ID (regardless of status - useful for viewing own pending events)
+ */
+export const getEventById = async (eventId: string): Promise<Event | null> => {
+  try {
+    const numericId = parseInt(eventId);
+    if (isNaN(numericId)) return null;
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', numericId)
+      .single();
+
+    if (error) {
+      console.error('Error getting event by ID from Supabase:', error);
+      return null;
+    }
+
+    if (!data) return null;
+
+    const event = {
+      id: String(data.id),
+      title: data.title,
+      description: data.description,
+      clubId: String(data.club_id),
+      dateISO: data.date_iso,
+      location: data.location,
+      createdBy: data.created_by,
+      createdAt: new Date(data.created_at).getTime(),
+      status: data.status || 'pending',
+      moderationNote: data.moderation_note || undefined,
+      imageUrl: data.image_url || undefined,
+    };
+
+    // Get attendee count for this event
+    const attendeeCounts = await getEventAttendeeCounts([event.id]);
+    return {
+      ...event,
+      attendees: attendeeCounts[event.id] || 0,
+    };
+  } catch (error) {
+    console.error('Error getting event by ID:', error);
+    return null;
+  }
+};
+
+/**
  * Get events by their IDs
  */
 export const getEventsByIds = async (eventIds: string[]): Promise<Event[]> => {
   try {
     if (eventIds.length === 0) return [];
 
+    // Convert string IDs to numbers, filtering out any invalid ones
+    const numericIds = eventIds
+      .map(id => {
+        const num = parseInt(id);
+        return isNaN(num) ? null : num;
+      })
+      .filter((id): id is number => id !== null);
+
+    if (numericIds.length === 0) return [];
+
     const { data, error } = await supabase
       .from('events')
       .select('*')
-      .in('id', eventIds.map(id => parseInt(id)))
+      .in('id', numericIds)
       .eq('status', 'approved')
       .order('date_iso', { ascending: true });
 
@@ -152,7 +266,7 @@ export const getEventsByIds = async (eventIds: string[]): Promise<Event[]> => {
       return [];
     }
 
-    return (data || []).map((row: any) => ({
+    const mapped = (data || []).map((row: any) => ({
       id: String(row.id),
       title: row.title,
       description: row.description,
@@ -163,6 +277,16 @@ export const getEventsByIds = async (eventIds: string[]): Promise<Event[]> => {
       createdAt: new Date(row.created_at).getTime(),
       status: row.status || 'approved',
       moderationNote: row.moderation_note || undefined,
+      imageUrl: row.image_url || undefined,
+    }));
+
+    // Get attendee counts for all events
+    const attendeeCounts = await getEventAttendeeCounts(mapped.map(e => e.id));
+
+    // Add attendee counts to events
+    return mapped.map(event => ({
+      ...event,
+      attendees: attendeeCounts[event.id] || 0,
     }));
   } catch (error) {
     console.error('Error getting events by IDs:', error);
@@ -177,32 +301,38 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
   try {
     const eventPolicy = await getEventPolicy();
     const status = eventPolicy.moderationMode === "off" ? "approved" : "pending";
+    console.log('📋 Event policy:', { moderationMode: eventPolicy.moderationMode, status });
+    
+    const insertData = {
+      title: eventInput.title,
+      description: eventInput.description,
+      club_id: parseInt(eventInput.clubId),
+      date_iso: eventInput.dateISO,
+      location: eventInput.location,
+      created_by: createdBy,
+      status: status,
+      created_at: new Date().toISOString(),
+      image_url: eventInput.imageUrl || null,
+    };
+    console.log('💾 Inserting event:', insertData);
     
     const { data, error } = await supabase
       .from('events')
-      .insert({
-        title: eventInput.title,
-        description: eventInput.description,
-        club_id: parseInt(eventInput.clubId),
-        date_iso: eventInput.dateISO,
-        location: eventInput.location,
-        created_by: createdBy,
-        status: status,
-        created_at: new Date().toISOString(),
-        image_url: eventInput.imageUrl || null,
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating event in Supabase:', error);
+      console.error('❌ Error creating event in Supabase:', error);
       if (error.code === '42501') {
         throw new Error('Permission denied. Please check your Supabase RLS policies.');
       }
       throw error;
     }
 
-    return {
+    console.log('✅ Event inserted successfully:', data);
+    console.log('📋 Event status from database:', data.status);
+    const result = {
       id: String(data.id),
       title: data.title,
       description: data.description,
@@ -215,8 +345,11 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
       moderationNote: data.moderation_note || undefined,
       imageUrl: data.image_url || undefined,
     };
+    console.log('🎉 Event created successfully:', result);
+    console.log('🔍 Final event status:', result.status);
+    return result;
   } catch (error) {
-    console.error('Error creating event:', error);
+    console.error('❌ Error creating event:', error);
     throw error;
   }
 };
