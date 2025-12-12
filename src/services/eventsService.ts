@@ -304,16 +304,18 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
     console.log('📋 Event policy:', { moderationMode: eventPolicy.moderationMode, status });
     
     const insertData = {
-      title: eventInput.title,
-      description: eventInput.description,
-      club_id: parseInt(eventInput.clubId),
-      date_iso: eventInput.dateISO,
-      location: eventInput.location,
-      created_by: createdBy,
-      status: status,
-      created_at: new Date().toISOString(),
-      image_url: eventInput.imageUrl || null,
-    };
+  title: eventInput.title,
+  description: eventInput.description,
+  club_id: parseInt(eventInput.clubId),
+  date_iso: eventInput.dateISO,
+  date: eventInput.dateISO, // date for Supabase
+  location: eventInput.location,
+  created_by: createdBy,
+  status: status,
+  created_at: new Date().toISOString(),
+  image_url: eventInput.imageUrl || null,
+};
+
     console.log('💾 Inserting event:', insertData);
     
     const { data, error } = await supabase
