@@ -158,11 +158,44 @@ export const toggleFavorite = async (userId: string, eventId: string): Promise<b
 };
 
 // SUPABASE RSVPs
-export const rsvpToEvent = async (userId: string, eventId: string): Promise<void> => {
-  const { error } = await supabase.from("event_rsvp").insert({
+export type NotificationTiming =
+  | '15min'
+  | '30min'
+  | '1hour'
+  | '2hours'
+  | '1day'
+  | '1week'
+  | 'custom'
+  | 'none';
+
+export const rsvpToEvent = async (
+  userId: string,
+  eventId: string,
+  notificationTiming?: NotificationTiming,
+  emailEnabled?: boolean,
+  customTime?: string
+): Promise<void> => {
+  const insertData: any = {
     firebase_uid: userId,
     event_id: eventId,
-  });
+  };
+
+  // Add notification timing if provided (requires notification_timing column in event_rsvp table)
+  if (notificationTiming) {
+    insertData.notification_timing = notificationTiming;
+  }
+
+  // Add email notification preference (requires email_notifications_enabled column in event_rsvp table)
+  if (emailEnabled !== undefined) {
+    insertData.email_notifications_enabled = emailEnabled;
+  }
+
+  // Store custom time if provided
+  if (customTime) {
+    insertData.custom_notification_time = customTime;
+  }
+
+  const { error } = await supabase.from("event_rsvp").insert(insertData);
 
   if (error) {
     console.error("Error RSVPing to event:", error);
@@ -213,14 +246,20 @@ export const getUserRSVPdEvents = async (userId: string): Promise<string[]> => {
   return data.map((row) => row.event_id.toString());
 };
 
-export const toggleRSVP = async (userId: string, eventId: string): Promise<boolean> => {
+export const toggleRSVP = async (
+  userId: string,
+  eventId: string,
+  notificationTiming?: NotificationTiming,
+  emailEnabled?: boolean,
+  customTime?: string
+): Promise<boolean> => {
   const isRSVPd = await isEventRSVPd(userId, eventId);
 
   if (isRSVPd) {
     await cancelRSVP(userId, eventId);
     return false;
   } else {
-    await rsvpToEvent(userId, eventId);
+    await rsvpToEvent(userId, eventId, notificationTiming, emailEnabled, customTime);
     return true;
   }
 };

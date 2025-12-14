@@ -38,6 +38,8 @@ import {
   isEventRSVPd
 } from "../src/services/interactionsService";
 import { useAppTheme, LightThemeColors } from "../src/ThemeContext";
+import { NotificationPreferenceModal, NotificationPreference } from "../src/components/NotificationPreferenceModal";
+import { scheduleEmailNotification, cancelEmailNotifications } from "../src/services/emailNotificationService";
 
 // Event interface
 interface Event {
@@ -73,6 +75,8 @@ export default function EventDetails() {
   const [rsvped, setRsvped] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [club, setClub] = useState<Club | null>(null);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [pendingRSVP, setPendingRSVP] = useState<{ eventId: string; eventTitle: string } | null>(null);
 
   // Track logged-in user
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -260,31 +264,79 @@ export default function EventDetails() {
         return;
       }
 
-      const newRSVPState = await toggleRSVPService(currentUser.uid, eventId);
-      setRsvped(newRSVPState);
-      setEvent(prev => prev ? { ...prev, isUserAttending: newRSVPState } : null);
-
-      if (newRSVPState) {
-        // RSVP'd successfully
-        try { 
-          await notifyRSVPConfirmation(eventTitle);
-          await addDoc(collection(db, "notifications"), {
-            userId: currentUser.uid,
-            message: `You RSVP'd for ${eventTitle}!`,
-            timestamp: serverTimestamp(),
-            read: false,
-          });
-        } catch {}
-      } else {
-        // Canceled RSVP
+      // If already RSVP'd, cancel immediately
+      if (rsvped) {
+        const newRSVPState = await toggleRSVPService(currentUser.uid, eventId);
+        setRsvped(newRSVPState);
+        setEvent(prev => prev ? { ...prev, isUserAttending: newRSVPState } : null);
+        
+        // Cancel all scheduled email notifications
+        await cancelEmailNotifications(eventId, currentUser.uid);
+        
         alert(`RSVP canceled for "${eventTitle}"`);
+        return;
       }
+
+      // If not RSVP'd, show notification preference modal
+      setPendingRSVP({ eventId, eventTitle });
+      setShowNotificationModal(true);
     } catch (error) {
       console.error("Error toggling RSVP:", error);
       alert("Something went wrong. Please try again.");
-      // Revert optimistic update
-      setRsvped(!rsvped);
-      setEvent(prev => prev ? { ...prev, isUserAttending: !prev.isUserAttending } : null);
+    }
+  };
+
+  // Handle RSVP confirmation with notification preferences
+  const handleRSVPConfirm = async (preference: NotificationPreference) => {
+    if (!pendingRSVP || !currentUser) return;
+
+    try {
+      const { eventId, eventTitle } = pendingRSVP;
+      
+      // Create RSVP with notification preferences
+      const newRSVPState = await toggleRSVPService(
+        currentUser.uid,
+        eventId,
+        preference.timing,
+        preference.emailEnabled,
+        preference.customTime
+      );
+
+      setRsvped(newRSVPState);
+      setEvent(prev => prev ? { ...prev, isUserAttending: newRSVPState } : null);
+
+      // Schedule email notification if enabled
+      if (preference.emailEnabled && preference.timing !== 'none' && currentUser.email) {
+        try {
+          await scheduleEmailNotification(
+            eventId,
+            currentUser.uid,
+            currentUser.email,
+            preference.timing,
+            preference.customTime
+          );
+        } catch (emailError) {
+          console.error("Error scheduling email notification:", emailError);
+          // Don't fail the RSVP if email scheduling fails
+        }
+      }
+
+      // Show confirmation
+      try {
+        await notifyRSVPConfirmation(eventTitle);
+        await addDoc(collection(db, "notifications"), {
+          userId: currentUser.uid,
+          message: `You RSVP'd for ${eventTitle}!`,
+          timestamp: serverTimestamp(),
+          read: false,
+        });
+      } catch {}
+
+      setPendingRSVP(null);
+      setShowNotificationModal(false);
+    } catch (error) {
+      console.error("Error confirming RSVP:", error);
+      alert("Something went wrong. Please try again.");
     }
   };
 
@@ -733,6 +785,32 @@ export default function EventDetails() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Notification Preference Modal */}
+      {event && (
+        <NotificationPreferenceModal
+          visible={showNotificationModal}
+          onClose={() => {
+            setShowNotificationModal(false);
+            setPendingRSVP(null);
+          }}
+          onConfirm={handleRSVPConfirm}
+          eventDate={(() => {
+            // Parse event date - handle both ISO format and separate date/time
+            try {
+              if (event.date && event.time) {
+                const dateStr = event.date.includes('T') ? event.date.split('T')[0] : event.date;
+                return new Date(`${dateStr}T${event.time}`);
+              } else if (event.date) {
+                return new Date(event.date);
+              }
+              return new Date();
+            } catch {
+              return new Date();
+            }
+          })()}
+        />
+      )}
     </View>
   );
 }
