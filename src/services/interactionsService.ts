@@ -163,29 +163,13 @@ export const toggleFavorite = async (userId: string, eventId: string): Promise<b
 };
 
 // SUPABASE RSVPs
-export type NotificationTiming =
-  | "15min"
-  | "30min"
-  | "1hour"
-  | "2hours"
-  | "1day"
-  | "1week"
-  | "custom"
-  | "none";
-
 export const rsvpToEvent = async (
   userId: string,
-  eventId: string,
-  notificationTiming?: NotificationTiming,
-  emailEnabled?: boolean,
-  customTime?: string
+  eventId: string
 ): Promise<void> => {
-  const payload: any = {
+  const payload = {
     firebase_uid: userId,
-    event_id: toBigIntId(eventId), // make sure it's a number if your DB column is bigint
-    notification_timing: notificationTiming ?? 'none',
-    email_notifications_enabled: emailEnabled ?? false,
-    custom_notification_time: customTime ?? null,
+    event_id: toBigIntId(eventId),
   };
 
   const { error } = await supabase
@@ -197,7 +181,6 @@ export const rsvpToEvent = async (
     throw error;
   }
 };
-
 
 export const cancelRSVP = async (userId: string, eventId: string): Promise<void> => {
   const eid = toBigIntId(eventId);
@@ -248,10 +231,7 @@ export const getUserRSVPdEvents = async (userId: string): Promise<string[]> => {
 
 export const toggleRSVP = async (
   userId: string,
-  eventId: string,
-  notificationTiming?: NotificationTiming,
-  emailEnabled?: boolean,
-  customTime?: string
+  eventId: string
 ): Promise<boolean> => {
   const isRSVPd = await isEventRSVPd(userId, eventId);
 
@@ -259,7 +239,7 @@ export const toggleRSVP = async (
     await cancelRSVP(userId, eventId);
     return false;
   } else {
-    await rsvpToEvent(userId, eventId, notificationTiming, emailEnabled, customTime);
+    await rsvpToEvent(userId, eventId);
     return true;
   }
 };

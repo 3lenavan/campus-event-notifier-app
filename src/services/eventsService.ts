@@ -1,6 +1,6 @@
+import { supabase } from '../../data/supabaseClient';
 import { getEventPolicy } from '../lib/eventPolicy';
 import { CreateEventInput, Event } from '../types';
-import { supabase } from '../../data/supabaseClient';
 import { getEventAttendeeCounts } from './interactionsService';
 
 /**
