@@ -1,4 +1,4 @@
-import { supabase } from '../../data/supabaseClient';
+import { supabase } from "../../data/supabaseClient";
 
 export type EventPolicy = {
   enabledGlobal: boolean;
@@ -28,37 +28,44 @@ const DEFAULT_POLICY: EventPolicy = {
   },
 };
 
+// Helper: treat these as "expected" errors when RLS/auth blocks reads/writes
+const isAuthOrRLSError = (error: any) => {
+  const msg = (error?.message || "").toLowerCase();
+  const status = (error as any)?.status;
+
+  return (
+    error?.code === "42501" || // RLS / insufficient_privilege
+    error?.code === "PGRST301" || // PostgREST auth-related
+    status === 401 ||
+    msg.includes("401") ||
+    msg.includes("jwt") ||
+    msg.includes("unauthorized") ||
+    msg.includes("permission") ||
+    msg.includes("row-level security") ||
+    msg.includes("row level security")
+  );
+};
+
 /**
  * Get the current event policy with sensible defaults
  */
 export const getEventPolicy = async (): Promise<EventPolicy> => {
   try {
     const { data, error } = await supabase
-      .from('event_policy')
-      .select('*')
-      .eq('id', 1)
+      .from("event_policy")
+      .select("*")
+      .eq("id", 1)
       .maybeSingle();
 
     if (error) {
       // If it's a permission/authorization error (RLS or 401), silently use default policy
       // This is expected if RLS policies aren't set up yet or user is not authenticated
-      const msg = (error?.message || "").toLowerCase();
-
-if (
-  error?.code === "42501" ||          // RLS / insufficient_privilege
-  error?.code === "PGRST301" ||       // PostgREST auth-related
-  msg.includes("401") ||
-  msg.includes("jwt") ||
-  msg.includes("unauthorized") ||
-  msg.includes("permission") ||
-  msg.includes("row-level security")
-) {
-
-        // Silently use default policy - this is expected behavior
+      if (isAuthOrRLSError(error)) {
         return DEFAULT_POLICY;
       }
+
       // For other errors, log but still return default
-      console.warn('Error getting event policy from Supabase:', error.message);
+      console.warn("Error getting event policy from Supabase:", error.message);
       return DEFAULT_POLICY;
     }
 
@@ -68,8 +75,8 @@ if (
         await setEventPolicy(DEFAULT_POLICY);
       } catch (createError: any) {
         // If creation fails (likely due to RLS), that's okay - we'll use the default
-        if (createError.code !== '42501') {
-          console.warn('Could not create default event policy:', createError.message);
+        if (!isAuthOrRLSError(createError)) {
+          console.warn("Could not create default event policy:", createError.message);
         }
       }
       return DEFAULT_POLICY;
@@ -81,8 +88,10 @@ if (
       enabledByClub: data.enabled_by_club ?? DEFAULT_POLICY.enabledByClub,
       moderationMode: data.moderation_mode ?? DEFAULT_POLICY.moderationMode,
       limits: {
-        maxPerClubPerDay: data.limits?.max_per_club_per_day ?? DEFAULT_POLICY.limits.maxPerClubPerDay,
-        userCooldownMinutes: data.limits?.user_cooldown_minutes ?? DEFAULT_POLICY.limits.userCooldownMinutes,
+        maxPerClubPerDay:
+          data.limits?.max_per_club_per_day ?? DEFAULT_POLICY.limits.maxPerClubPerDay,
+        userCooldownMinutes:
+          data.limits?.user_cooldown_minutes ?? DEFAULT_POLICY.limits.userCooldownMinutes,
         allowImages: data.limits?.allow_images ?? DEFAULT_POLICY.limits.allowImages,
         maxImageMB: data.limits?.max_image_mb ?? DEFAULT_POLICY.limits.maxImageMB,
         maxTitleLen: data.limits?.max_title_len ?? DEFAULT_POLICY.limits.maxTitleLen,
@@ -90,7 +99,7 @@ if (
       },
     };
   } catch (error) {
-    console.error('Error getting event policy:', error);
+    console.error("Error getting event policy:", error);
     return DEFAULT_POLICY;
   }
 };
@@ -100,9 +109,8 @@ if (
  */
 export const setEventPolicy = async (policy: EventPolicy): Promise<void> => {
   try {
-    const { error } = await supabase
-      .from('event_policy')
-      .upsert({
+    const { error } = await supabase.from("event_policy").upsert(
+      {
         id: 1,
         enabled_global: policy.enabledGlobal,
         enabled_by_club: policy.enabledByClub,
@@ -116,37 +124,30 @@ export const setEventPolicy = async (policy: EventPolicy): Promise<void> => {
           max_desc_len: policy.limits.maxDescLen,
         },
         updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'id',
-      });
+      },
+      {
+        onConflict: "id",
+      }
+    );
 
     if (error) {
       // If it's a permission/authorization error, don't throw - just log
-      const msg = (error?.message || "").toLowerCase();
-
-if (
-  error?.code === "42501" ||        // RLS / permission denied
-  error?.code === "PGRST301" ||     // auth / policy error
-  msg.includes("401") ||
-  msg.includes("unauthorized") ||
-  msg.includes("permission") ||
-  msg.includes("row level security") ||
-  msg.includes("jwt")
-) {
-
-        console.log('Cannot set event policy (RLS/Unauthorized), using default policy');
+      if (isAuthOrRLSError(error)) {
+        console.log("Cannot set event policy (RLS/Unauthorized), using default policy");
         return; // Silently fail - default policy will be used
       }
-      console.error('Error setting event policy in Supabase:', error);
+
+      console.error("Error setting event policy in Supabase:", error);
       throw error;
     }
   } catch (error: any) {
     // If it's a permission/authorization error, don't throw
-    if (error?.code === '42501' || error?.code === 'PGRST301' || error?.status === 401) {
-      console.log('Cannot set event policy (RLS/Unauthorized), using default policy');
+    if (isAuthOrRLSError(error)) {
+      console.log("Cannot set event policy (RLS/Unauthorized), using default policy");
       return; // Silently fail - default policy will be used
     }
-    console.error('Error setting event policy:', error);
+
+    console.error("Error setting event policy:", error);
     throw error;
   }
 };
@@ -157,21 +158,21 @@ if (
 export const isCreationEnabledForClub = async (clubId: string): Promise<boolean> => {
   try {
     const policy = await getEventPolicy();
-    
+
     // If global is disabled, no club can create events
     if (!policy.enabledGlobal) {
       return false;
     }
-    
+
     // If club-specific setting exists, use it
     if (clubId in policy.enabledByClub) {
       return policy.enabledByClub[clubId];
     }
-    
+
     // Default to enabled if no specific setting
     return true;
   } catch (error) {
-    console.error('Error checking club creation policy:', error);
+    console.error("Error checking club creation policy:", error);
     return false;
   }
 };

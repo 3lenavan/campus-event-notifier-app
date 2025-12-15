@@ -307,3 +307,5 @@ For the "custom time" option, you'll need to implement a date/time picker in the
 - The system supports multiple notification timings per RSVP
 - Failed emails can be retried by updating their status back to 'pending'
 
+
+
