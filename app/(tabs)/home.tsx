@@ -6,10 +6,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthUser } from "../../src/hooks/useAuthUser";
 import { listApprovedEvents } from "../../src/services/eventsService";
 import { listClubs } from "../../src/services/clubsService";
-import { getEventsInteractions, toggleFavorite as toggleFavoriteService, toggleLike as toggleLikeService } from "../../src/services/interactionsService";
+import {
+  getEventsInteractions,
+  toggleFavorite as toggleFavoriteService,
+  toggleLike as toggleLikeService,
+} from "../../src/services/interactionsService";
 import EventCard, { Event as BaseEvent } from "../event-card";
 import { useAppTheme, LightThemeColors } from "../../src/ThemeContext";
-
 
 type FeedEvent = BaseEvent & {
   likes: number;
@@ -27,7 +30,7 @@ export default function HomeScreen() {
   const themeContext = useAppTheme();
   const colors = themeContext?.colors || LightThemeColors;
   const isDark = themeContext?.isDark || false;
-  
+
   useEffect(() => {
     const unsub = getAuth().onAuthStateChanged((user) => {
       if (!user) {
@@ -40,177 +43,208 @@ export default function HomeScreen() {
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadApproved = useCallback(async (forceRefresh: boolean = false) => {
-    try {
-      console.log('🔄 Loading approved events...', { forceRefresh });
-      const approved = await listApprovedEvents(forceRefresh);
-      console.log('📋 Loaded events:', approved.length, approved);
-      const clubs = await listClubs();
-      
-      // Get current date/time to filter out past events
-      const now = new Date();
-      console.log('⏰ Current time:', now.toISOString());
-      
-      // Debug: Log all approved events before filtering
-      console.log('📅 Approved events before date filter:', approved.map(e => ({
-        id: e.id,
-        title: e.title,
-        dateISO: e.dateISO,
-        status: e.status
-      })));
-      console.log('⏰ Current time for filtering:', now.toISOString());
-      
-      // Map events to FeedEvent format and filter out past events
-      // Only show events that are in the future (time hasn't passed)
-      const eventsMapped: FeedEvent[] = approved
-        .filter((event) => {
-          const eventDate = new Date(event.dateISO);
-          const isFuture = eventDate > now; // Use > instead of >= to exclude events that have already started
-          
-          if (!isFuture) {
-            console.log('⏭️ Filtered out past event:', event.title, eventDate.toISOString(), 'vs', now.toISOString());
-          } else {
-            console.log('✅ Keeping future event:', event.title, eventDate.toISOString());
-          }
-          return isFuture;
-        })
-        .map((event) => {
-          const date = new Date(event.dateISO);
-          return {
-            id: event.id,
-            title: event.title,
-            description: event.description,
-            date: date.toISOString(),
-            time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
-            location: event.location,
-            category: "Club Event",
-            attendees: event.attendees || 0,
-            maxAttendees: undefined,
-            imageUrl: event.imageUrl,
-            isUserAttending: false,
-            likes: 0,
-            liked: false,
-            favorited: false,
-            club: { id: event.clubId, name: clubs.find((c:any)=>c.id===event.clubId)?.name || "Unknown Club" },
-          };
-        })
-        .sort((a,b)=> new Date(a.date).getTime() - new Date(b.date).getTime());
+  const loadApproved = useCallback(
+    async (forceRefresh: boolean = false) => {
+      try {
+        console.log("🔄 Loading approved events...", { forceRefresh });
+        const approved = await listApprovedEvents(forceRefresh);
+        console.log("📋 Loaded events:", approved.length, approved);
+        const clubs = await listClubs();
 
-      // Load likes and favorites if user is logged in
-      if (user?.uid) {
-        const eventIds = eventsMapped.map(e => e.id);
-        const interactions = await getEventsInteractions(user.uid, eventIds);
-        
-        // Update events with interaction data
-        eventsMapped.forEach(event => {
-          event.liked = interactions.likedEvents.has(event.id);
-          event.favorited = interactions.favoritedEvents.has(event.id);
-          event.likes = interactions.likeCounts[event.id] || 0;
-        });
+        // Get current date/time to filter out past events
+        const now = new Date();
+        console.log("⏰ Current time:", now.toISOString());
+
+        // Debug: Log all approved events before filtering
+        console.log(
+          "📅 Approved events before date filter:",
+          approved.map((e) => ({
+            id: e.id,
+            title: e.title,
+            dateISO: e.dateISO,
+            status: e.status,
+          }))
+        );
+        console.log("⏰ Current time for filtering:", now.toISOString());
+
+        const eventsMapped: FeedEvent[] = approved
+          .filter((event) => {
+            const eventDate = new Date(event.dateISO);
+            const isFuture = eventDate > now;
+
+            if (!isFuture) {
+              console.log(
+                "⏭️ Filtered out past event:",
+                event.title,
+                eventDate.toISOString(),
+                "vs",
+                now.toISOString()
+              );
+            } else {
+              console.log("✅ Keeping future event:", event.title, eventDate.toISOString());
+            }
+            return isFuture;
+          })
+          .map((event) => {
+            const eventDate = new Date(event.dateISO);
+
+            return {
+              id: event.id,
+              title: event.title,
+              description: event.description,
+
+              // ✅ KEEP the original ISO (don’t force UTC with toISOString())
+              // This prevents the “Dec 15 vs Dec 14” mismatch.
+              date: event.dateISO,
+
+              // ✅ Time formatted from the same ISO source
+              time: eventDate.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              }),
+
+              location: event.location,
+              category: "Club Event",
+              attendees: event.attendees || 0,
+              maxAttendees: undefined,
+              imageUrl: event.imageUrl,
+              isUserAttending: false,
+
+              likes: 0,
+              liked: false,
+              favorited: false,
+
+              club: {
+                id: event.clubId,
+                name: clubs.find((c: any) => c.id === event.clubId)?.name || "Unknown Club",
+              },
+            };
+          })
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        // Load likes and favorites if user is logged in
+        if (user?.uid) {
+          const eventIds = eventsMapped.map((e) => e.id);
+          const interactions = await getEventsInteractions(user.uid, eventIds);
+
+          eventsMapped.forEach((event) => {
+            event.liked = interactions.likedEvents.has(event.id);
+            event.favorited = interactions.favoritedEvents.has(event.id);
+            event.likes = interactions.likeCounts[event.id] || 0;
+          });
+        }
+
+        console.log("✅ Setting events:", eventsMapped.length);
+        setEvents(eventsMapped);
+      } catch (e) {
+        console.error("❌ Error loading approved events:", e);
       }
+    },
+    [user]
+  );
 
-      console.log('✅ Setting events:', eventsMapped.length);
-      setEvents(eventsMapped);
-    } catch (e) {
-      console.error("❌ Error loading approved events:", e);
-    }
-  }, [user]);
-
-  useEffect(() => { loadApproved(true); }, [loadApproved]);
+  useEffect(() => {
+    loadApproved(true);
+  }, [loadApproved]);
 
   const onPressEvent = useCallback((event: BaseEvent) => {
     router.push({ pathname: "/event-details-screen", params: { id: event.id } });
   }, []);
 
-  const toggleLike = useCallback(async (eventId: string) => {
-    if (!user?.uid) {
-      alert("Please log in to like events.");
-      return;
-    }
+  const toggleLike = useCallback(
+    async (eventId: string) => {
+      if (!user?.uid) {
+        alert("Please log in to like events.");
+        return;
+      }
 
-    try {
-      // Optimistically update UI
-      setEvents((prev) =>
-        prev.map((e) => {
-          if (e.id === eventId) {
-            const newLiked = !e.liked;
-            return {
-              ...e,
-              liked: newLiked,
-              likes: e.likes + (newLiked ? 1 : -1),
-            };
-          }
-          return e;
-        })
-      );
-
-      // Update in Firestore
-      const newLikedState = await toggleLikeService(user.uid, eventId);
-      
-      // Reload to get accurate like count
-      const interactions = await getEventsInteractions(user.uid, [eventId]);
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === eventId
-            ? {
+      try {
+        // Optimistically update UI
+        setEvents((prev) =>
+          prev.map((e) => {
+            if (e.id === eventId) {
+              const newLiked = !e.liked;
+              return {
                 ...e,
-                liked: interactions.likedEvents.has(eventId),
-                likes: interactions.likeCounts[eventId] || 0,
-              }
-            : e
-        )
-      );
-    } catch (error) {
-      console.error("Error toggling like:", error);
-      // Revert optimistic update on error
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === eventId
-            ? { ...e, liked: !e.liked, likes: e.likes + (e.liked ? 1 : -1) }
-            : e
-        )
-      );
-      alert("Failed to update like. Please try again.");
-    }
-  }, [user]);
+                liked: newLiked,
+                likes: e.likes + (newLiked ? 1 : -1),
+              };
+            }
+            return e;
+          })
+        );
 
-  const toggleFavorite = useCallback(async (eventId: string) => {
-    if (!user?.uid) {
-      alert("Please log in to favorite events.");
-      return;
-    }
+        await toggleLikeService(user.uid, eventId);
 
-    try {
-      // Optimistically update UI
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === eventId ? { ...e, favorited: !e.favorited } : e
-        )
-      );
+        // Reload to get accurate like count
+        const interactions = await getEventsInteractions(user.uid, [eventId]);
+        setEvents((prev) =>
+          prev.map((e) =>
+            e.id === eventId
+              ? {
+                  ...e,
+                  liked: interactions.likedEvents.has(eventId),
+                  likes: interactions.likeCounts[eventId] || 0,
+                }
+              : e
+          )
+        );
+      } catch (error) {
+        console.error("Error toggling like:", error);
 
-      // Update in Firestore
-      await toggleFavoriteService(user.uid, eventId);
-      
-      // Reload to ensure consistency
-      const interactions = await getEventsInteractions(user.uid, [eventId]);
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === eventId
-            ? { ...e, favorited: interactions.favoritedEvents.has(eventId) }
-            : e
-        )
-      );
-    } catch (error) {
-      console.error("Error toggling favorite:", error);
-      // Revert optimistic update on error
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === eventId ? { ...e, favorited: !e.favorited } : e
-        )
-      );
-      alert("Failed to update favorite. Please try again.");
-    }
-  }, [user]);
+        // Revert optimistic update on error
+        setEvents((prev) =>
+          prev.map((e) =>
+            e.id === eventId
+              ? { ...e, liked: !e.liked, likes: e.likes + (e.liked ? 1 : -1) }
+              : e
+          )
+        );
+
+        alert("Failed to update like. Please try again.");
+      }
+    },
+    [user]
+  );
+
+  const toggleFavorite = useCallback(
+    async (eventId: string) => {
+      if (!user?.uid) {
+        alert("Please log in to favorite events.");
+        return;
+      }
+
+      try {
+        // Optimistically update UI
+        setEvents((prev) =>
+          prev.map((e) => (e.id === eventId ? { ...e, favorited: !e.favorited } : e))
+        );
+
+        await toggleFavoriteService(user.uid, eventId);
+
+        // Reload to ensure consistency
+        const interactions = await getEventsInteractions(user.uid, [eventId]);
+        setEvents((prev) =>
+          prev.map((e) =>
+            e.id === eventId
+              ? { ...e, favorited: interactions.favoritedEvents.has(eventId) }
+              : e
+          )
+        );
+      } catch (error) {
+        console.error("Error toggling favorite:", error);
+
+        // Revert optimistic update on error
+        setEvents((prev) =>
+          prev.map((e) => (e.id === eventId ? { ...e, favorited: !e.favorited } : e))
+        );
+
+        alert("Failed to update favorite. Please try again.");
+      }
+    },
+    [user]
+  );
 
   const toggleRSVP = useCallback((eventId: string) => {
     setEvents((prev) =>
@@ -234,14 +268,14 @@ export default function HomeScreen() {
   // Force refresh when screen is focused (important for newly created events)
   useFocusEffect(
     useCallback(() => {
-      console.log('👁️ Home screen focused, refreshing events...');
-      // Longer delay to ensure database has committed any recent changes
+      console.log("👁️ Home screen focused, refreshing events...");
       const timer = setTimeout(() => {
-        console.log('🔄 Executing delayed refresh...');
+        console.log("🔄 Executing delayed refresh...");
         loadApproved(true);
       }, 600);
+
       return () => {
-        console.log('🧹 Cleaning up focus effect timer');
+        console.log("🧹 Cleaning up focus effect timer");
         clearTimeout(timer);
       };
     }, [loadApproved])
@@ -257,7 +291,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
@@ -304,7 +338,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  listContent: { paddingHorizontal: 20, paddingBottom: 120, alignItems: 'stretch' },
+  listContent: { paddingHorizontal: 20, paddingBottom: 120, alignItems: "stretch" },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -2,9 +2,15 @@
 // Likes = Supabase
 // Favorites = Supabase
 
-import { supabase } from "../../data/supabaseClient"; 
+import { supabase } from "../../data/supabaseClient";
 import { db } from "../lib/firebase"; // only needed for notifications etc., KEEPING
 
+// Helper: event_id is bigint in Supabase, so always convert safely
+const toBigIntId = (id: string | number): number => {
+  const n = typeof id === "number" ? id : parseInt(String(id), 10);
+  if (Number.isNaN(n)) throw new Error(`Invalid event_id: ${id}`);
+  return n;
+};
 
 // SUPABASE LIKES
 export const likeEvent = async (userId: string, eventId: string): Promise<void> => {
@@ -85,9 +91,8 @@ export const getUserLikedEvents = async (userId: string): Promise<string[]> => {
     return [];
   }
 
-  return data.map((row) => row.event_id);
+  return data.map((row: any) => row.event_id);
 };
-
 
 // SUPABASE FAVORITES — THIS SECTION IS EXACTLY WHAT YOU ALREADY HAD
 export const favoriteEvent = async (userId: string, eventId: string): Promise<void> => {
@@ -142,7 +147,7 @@ export const getUserFavoritedEvents = async (userId: string): Promise<string[]> 
     return [];
   }
 
-  return data.map((row) => row.event_id);
+  return data.map((row: any) => row.event_id);
 };
 
 export const toggleFavorite = async (userId: string, eventId: string): Promise<boolean> => {
@@ -159,14 +164,14 @@ export const toggleFavorite = async (userId: string, eventId: string): Promise<b
 
 // SUPABASE RSVPs
 export type NotificationTiming =
-  | '15min'
-  | '30min'
-  | '1hour'
-  | '2hours'
-  | '1day'
-  | '1week'
-  | 'custom'
-  | 'none';
+  | "15min"
+  | "30min"
+  | "1hour"
+  | "2hours"
+  | "1day"
+  | "1week"
+  | "custom"
+  | "none";
 
 export const rsvpToEvent = async (
   userId: string,
@@ -175,27 +180,17 @@ export const rsvpToEvent = async (
   emailEnabled?: boolean,
   customTime?: string
 ): Promise<void> => {
-  const insertData: any = {
+  const payload: any = {
     firebase_uid: userId,
-    event_id: eventId,
+    event_id: toBigIntId(eventId), // make sure it's a number if your DB column is bigint
+    notification_timing: notificationTiming ?? 'none',
+    email_notifications_enabled: emailEnabled ?? false,
+    custom_notification_time: customTime ?? null,
   };
 
-  // Add notification timing if provided (requires notification_timing column in event_rsvp table)
-  if (notificationTiming) {
-    insertData.notification_timing = notificationTiming;
-  }
-
-  // Add email notification preference (requires email_notifications_enabled column in event_rsvp table)
-  if (emailEnabled !== undefined) {
-    insertData.email_notifications_enabled = emailEnabled;
-  }
-
-  // Store custom time if provided
-  if (customTime) {
-    insertData.custom_notification_time = customTime;
-  }
-
-  const { error } = await supabase.from("event_rsvp").insert(insertData);
+  const { error } = await supabase
+    .from("event_rsvp")
+    .upsert(payload, { onConflict: "event_id,firebase_uid" });
 
   if (error) {
     console.error("Error RSVPing to event:", error);
@@ -203,12 +198,15 @@ export const rsvpToEvent = async (
   }
 };
 
+
 export const cancelRSVP = async (userId: string, eventId: string): Promise<void> => {
+  const eid = toBigIntId(eventId);
+
   const { error } = await supabase
     .from("event_rsvp")
     .delete()
     .eq("firebase_uid", userId)
-    .eq("event_id", eventId);
+    .eq("event_id", eid); // ✅ bigint-safe
 
   if (error) {
     console.error("Error canceling RSVP:", error);
@@ -217,11 +215,13 @@ export const cancelRSVP = async (userId: string, eventId: string): Promise<void>
 };
 
 export const isEventRSVPd = async (userId: string, eventId: string): Promise<boolean> => {
+  const eid = toBigIntId(eventId);
+
   const { data, error } = await supabase
     .from("event_rsvp")
     .select("id")
     .eq("firebase_uid", userId)
-    .eq("event_id", eventId)
+    .eq("event_id", eid) // ✅ bigint-safe
     .maybeSingle();
 
   if (error) {
@@ -243,7 +243,7 @@ export const getUserRSVPdEvents = async (userId: string): Promise<string[]> => {
     return [];
   }
 
-  return data.map((row) => row.event_id.toString());
+  return (data || []).map((row: any) => String(row.event_id));
 };
 
 export const toggleRSVP = async (
@@ -268,13 +268,15 @@ export const toggleRSVP = async (
  * Get attendee counts for multiple events
  * Returns a map of eventId -> attendee count
  */
-export const getEventAttendeeCounts = async (eventIds: string[]): Promise<Record<string, number>> => {
+export const getEventAttendeeCounts = async (
+  eventIds: string[]
+): Promise<Record<string, number>> => {
   if (eventIds.length === 0) return {};
 
   try {
     // Convert string IDs to numbers
     const numericIds = eventIds
-      .map(id => {
+      .map((id) => {
         const num = parseInt(id);
         return isNaN(num) ? null : num;
       })
@@ -284,19 +286,19 @@ export const getEventAttendeeCounts = async (eventIds: string[]): Promise<Record
 
     // Query all RSVPs for these events
     const { data, error } = await supabase
-      .from('event_rsvp')
-      .select('event_id')
-      .in('event_id', numericIds);
+      .from("event_rsvp")
+      .select("event_id")
+      .in("event_id", numericIds);
 
     if (error) {
-      console.error('Error getting attendee counts:', error);
+      console.error("Error getting attendee counts:", error);
       return {};
     }
 
     // Count RSVPs per event
     const counts: Record<string, number> = {};
-    eventIds.forEach(id => counts[id] = 0); // Initialize all to 0
-    
+    eventIds.forEach((id) => (counts[id] = 0)); // Initialize all to 0
+
     if (data) {
       data.forEach((row: any) => {
         const eventId = String(row.event_id);
@@ -308,7 +310,7 @@ export const getEventAttendeeCounts = async (eventIds: string[]): Promise<Record
 
     return counts;
   } catch (error) {
-    console.error('Error getting attendee counts:', error);
+    console.error("Error getting attendee counts:", error);
     return {};
   }
 };

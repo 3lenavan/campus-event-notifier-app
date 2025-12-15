@@ -33,11 +33,11 @@ export const listEvents = async (): Promise<Event[]> => {
     }));
 
     // Get attendee counts for all events
-    const eventIds = mapped.map(e => e.id);
+    const eventIds = mapped.map((e) => e.id);
     const attendeeCounts = await getEventAttendeeCounts(eventIds);
 
     // Add attendee counts to events
-    return mapped.map(event => ({
+    return mapped.map((event) => ({
       ...event,
       attendees: attendeeCounts[event.id] || 0,
     }));
@@ -52,27 +52,9 @@ export const listEvents = async (): Promise<Event[]> => {
  */
 export const listApprovedEvents = async (forceRefresh: boolean = false): Promise<Event[]> => {
   try {
-    // Always query fresh data - Supabase queries are fresh by default but we can ensure it
-    // by building the query fresh each time
     console.log('🔍 Querying Supabase for approved events...');
-    
-    // First, let's check ALL events to see what we have
-    const { data: allEvents, error: allError } = await supabase
-      .from('events')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(10);
-    
-    if (!allError && allEvents) {
-      console.log('📊 All recent events (last 10):', allEvents.map(e => ({
-        id: e.id,
-        title: e.title,
-        status: e.status,
-        date_iso: e.date_iso
-      })));
-    }
-    
-    // Now get only approved events
+
+    // Get only approved events
     const { data, error } = await supabase
       .from('events')
       .select('*')
@@ -83,8 +65,6 @@ export const listApprovedEvents = async (forceRefresh: boolean = false): Promise
       console.error('❌ Error listing approved events from Supabase:', error);
       return [];
     }
-
-    console.log('📊 Raw events from Supabase:', data?.length || 0, data);
 
     const mapped = (data || []).map((row: any) => ({
       id: String(row.id),
@@ -101,11 +81,11 @@ export const listApprovedEvents = async (forceRefresh: boolean = false): Promise
     }));
 
     // Get attendee counts for all events
-    const eventIds = mapped.map(e => e.id);
+    const eventIds = mapped.map((e) => e.id);
     const attendeeCounts = await getEventAttendeeCounts(eventIds);
 
     // Add attendee counts to events
-    const eventsWithAttendees = mapped.map(event => ({
+    const eventsWithAttendees = mapped.map((event) => ({
       ...event,
       attendees: attendeeCounts[event.id] || 0,
     }));
@@ -130,8 +110,8 @@ export const listClubEvents = async (clubId: string): Promise<Event[]> => {
       .eq('status', 'approved')
       .order('date_iso', { ascending: true });
 
-    // 🔍 DEBUG LOG #1 — check exactly what Supabase sends
-    console.log("RAW events from Supabase (listClubEvents):", data);
+    // 🔍 DEBUG LOG — check exactly what Supabase sends
+    console.log('RAW events from Supabase (listClubEvents):', data);
 
     if (error) {
       console.error('Error listing club events from Supabase:', error);
@@ -147,17 +127,17 @@ export const listClubEvents = async (clubId: string): Promise<Event[]> => {
       location: row.location,
       createdBy: row.created_by,
       createdAt: new Date(row.created_at).getTime(),
-      status: row.status || 'pending',
+      status: row.status || 'approved', // ✅ FIXED: since we filter approved
       moderationNote: row.moderation_note || undefined,
       imageUrl: row.image_url || undefined,
     }));
 
     // Get attendee counts for all events
-    const eventIds = mapped.map(e => e.id);
+    const eventIds = mapped.map((e) => e.id);
     const attendeeCounts = await getEventAttendeeCounts(eventIds);
 
     // Add attendee counts to events
-    return mapped.map(event => ({
+    return mapped.map((event) => ({
       ...event,
       attendees: attendeeCounts[event.id] || 0,
     }));
@@ -246,7 +226,7 @@ export const getEventsByIds = async (eventIds: string[]): Promise<Event[]> => {
 
     // Convert string IDs to numbers, filtering out any invalid ones
     const numericIds = eventIds
-      .map(id => {
+      .map((id) => {
         const num = parseInt(id);
         return isNaN(num) ? null : num;
       })
@@ -281,10 +261,10 @@ export const getEventsByIds = async (eventIds: string[]): Promise<Event[]> => {
     }));
 
     // Get attendee counts for all events
-    const attendeeCounts = await getEventAttendeeCounts(mapped.map(e => e.id));
+    const attendeeCounts = await getEventAttendeeCounts(mapped.map((e) => e.id));
 
     // Add attendee counts to events
-    return mapped.map(event => ({
+    return mapped.map((event) => ({
       ...event,
       attendees: attendeeCounts[event.id] || 0,
     }));
@@ -300,9 +280,9 @@ export const getEventsByIds = async (eventIds: string[]): Promise<Event[]> => {
 export const createEvent = async (eventInput: CreateEventInput, createdBy: string): Promise<Event> => {
   try {
     const eventPolicy = await getEventPolicy();
-    const status = eventPolicy.moderationMode === "off" ? "approved" : "pending";
+    const status = eventPolicy.moderationMode === 'off' ? 'approved' : 'pending';
     console.log('📋 Event policy:', { moderationMode: eventPolicy.moderationMode, status });
-    
+
     const insertData = {
       title: eventInput.title,
       description: eventInput.description,
@@ -315,12 +295,8 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
       image_url: eventInput.imageUrl || null,
     };
     console.log('💾 Inserting event:', insertData);
-    
-    const { data, error } = await supabase
-      .from('events')
-      .insert(insertData)
-      .select()
-      .single();
+
+    const { data, error } = await supabase.from('events').insert(insertData).select().single();
 
     if (error) {
       console.error('❌ Error creating event in Supabase:', error);
@@ -332,6 +308,7 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
 
     console.log('✅ Event inserted successfully:', data);
     console.log('📋 Event status from database:', data.status);
+
     const result = {
       id: String(data.id),
       title: data.title,
@@ -345,6 +322,7 @@ export const createEvent = async (eventInput: CreateEventInput, createdBy: strin
       moderationNote: data.moderation_note || undefined,
       imageUrl: data.image_url || undefined,
     };
+
     console.log('🎉 Event created successfully:', result);
     console.log('🔍 Final event status:', result.status);
     return result;

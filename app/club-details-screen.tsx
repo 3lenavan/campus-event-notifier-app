@@ -90,16 +90,20 @@ export default function ClubDetails() {
   );
 
   const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      Academic: "#3B82F6",
-      Social: "#8B5CF6",
-      Sports: "#22C55E",
-      Arts: "#EC4899",
-      Career: "#F97316",
-      Other: "#6B7280",
-    };
-    return colors[category] || colors["Other"];
+  const normalized = (category ?? "").trim();
+
+  const colors: Record<string, string> = {
+    Academic: "#3B82F6",
+    Social: "#8B5CF6",
+    Sports: "#22C55E",
+    Arts: "#EC4899",
+    Career: "#F97316",
+    Special: "#FACC15",
+    Other: "#6B7280",
   };
+
+  return colors[normalized] || colors.Other;
+};
 
   const handleEventPress = (event: any) => {
     router.push({ pathname: "/event-details-screen", params: { id: event.id } });

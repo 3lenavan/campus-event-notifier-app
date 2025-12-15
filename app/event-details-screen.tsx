@@ -12,7 +12,6 @@ import {
   doc,
   getDoc,
   serverTimestamp,
-  setDoc,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
@@ -35,19 +34,30 @@ import {
   toggleFavorite as toggleFavoriteService,
   toggleLike as toggleLikeService,
   toggleRSVP as toggleRSVPService,
-  isEventRSVPd
+  isEventRSVPd,
 } from "../src/services/interactionsService";
 import { useAppTheme, LightThemeColors } from "../src/ThemeContext";
-import { NotificationPreferenceModal, NotificationPreference } from "../src/components/NotificationPreferenceModal";
-import { scheduleEmailNotification, cancelEmailNotifications } from "../src/services/emailNotificationService";
+import {
+  NotificationPreferenceModal,
+  NotificationPreference,
+} from "../src/components/NotificationPreferenceModal";
+import {
+  scheduleEmailNotification,
+  cancelEmailNotifications,
+} from "../src/services/emailNotificationService";
 
 // Event interface
 interface Event {
   id: string;
   title: string;
   description: string;
+
+  // ✅ Store full ISO string here now (ex: 2025-12-15T02:17:00.000Z)
   date: string;
+
+  // Display time string (ex: 21:17)
   time: string;
+
   location: string;
   category: string;
   attendees: number;
@@ -90,18 +100,28 @@ export default function EventDetails() {
     const fetchEvent = async () => {
       try {
         setLoading(true);
-        
-        // First try to get the event by ID directly (works for both approved and pending events)
+
+        // First try to get the event by ID directly
         const foundEvent = await getEventById(id);
-        
+
         if (foundEvent) {
-          const date = new Date(foundEvent.dateISO);
+          const eventDate = new Date(foundEvent.dateISO);
+
           const eventData: Event = {
             id: foundEvent.id,
             title: foundEvent.title,
             description: foundEvent.description,
-            date: date.toISOString().split('T')[0],
-            time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+
+            // ✅ Keep ISO (prevents UTC date shift bugs)
+            date: foundEvent.dateISO,
+
+            // ✅ Time formatted from same ISO
+            time: eventDate.toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }),
+
             location: foundEvent.location,
             category: "Club Event",
             attendees: foundEvent.attendees || 0,
@@ -112,8 +132,9 @@ export default function EventDetails() {
             fullDescription: foundEvent.description,
             status: foundEvent.status,
           };
+
           setEvent(eventData);
-          
+
           // Fetch club information
           if (foundEvent.clubId) {
             try {
@@ -125,24 +146,34 @@ export default function EventDetails() {
           }
 
           // Load RSVP status if user is logged in (only for approved events)
-          if (currentUser?.uid && foundEvent.status === 'approved') {
+          if (currentUser?.uid && foundEvent.status === "approved") {
             const isRSVPd = await isEventRSVPd(currentUser.uid, foundEvent.id);
             setRsvped(isRSVPd);
-            setEvent(prev => prev ? { ...prev, isUserAttending: isRSVPd } : prev);
+            setEvent((prev) => (prev ? { ...prev, isUserAttending: isRSVPd } : prev));
           }
         } else {
-          // Fallback: Try approved events list (for backward compatibility)
+          // Fallback: Try approved events list (backward compatibility)
           const approvedEvents = await listApprovedEvents();
-          const fallbackEvent = approvedEvents.find(e => e.id === id);
-          
+          const fallbackEvent = approvedEvents.find((e) => e.id === id);
+
           if (fallbackEvent) {
-            const date = new Date(fallbackEvent.dateISO);
+            const eventDate = new Date(fallbackEvent.dateISO);
+
             const eventData: Event = {
               id: fallbackEvent.id,
               title: fallbackEvent.title,
               description: fallbackEvent.description,
-              date: date.toISOString().split('T')[0],
-              time: date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+
+              // ✅ Keep ISO
+              date: fallbackEvent.dateISO,
+
+              // ✅ Time from same ISO
+              time: eventDate.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              }),
+
               location: fallbackEvent.location,
               category: "Club Event",
               attendees: fallbackEvent.attendees || 0,
@@ -153,8 +184,9 @@ export default function EventDetails() {
               fullDescription: fallbackEvent.description,
               status: fallbackEvent.status,
             };
+
             setEvent(eventData);
-            
+
             if (fallbackEvent.clubId) {
               try {
                 const clubData = await getClubByIdSupabase(Number(fallbackEvent.clubId));
@@ -167,7 +199,7 @@ export default function EventDetails() {
             if (currentUser?.uid) {
               const isRSVPd = await isEventRSVPd(currentUser.uid, fallbackEvent.id);
               setRsvped(isRSVPd);
-              setEvent(prev => prev ? { ...prev, isUserAttending: isRSVPd } : prev);
+              setEvent((prev) => (prev ? { ...prev, isUserAttending: isRSVPd } : prev));
             }
           } else {
             // Last fallback to Firestore if not found in Supabase
@@ -187,6 +219,7 @@ export default function EventDetails() {
         setLoading(false);
       }
     };
+
     fetchEvent();
   }, [id, currentUser?.uid]);
 
@@ -202,10 +235,11 @@ export default function EventDetails() {
           setFavorited(interactions.favoritedEvents.has(event.id));
           setRsvped(interactions.rsvpedEvents.has(event.id));
           setLikeCount(interactions.likeCounts[event.id] || 0);
-          // Update event state to reflect RSVP status
-          setEvent(prev => prev ? { ...prev, isUserAttending: interactions.rsvpedEvents.has(event.id) } : null);
+
+          setEvent((prev) =>
+            prev ? { ...prev, isUserAttending: interactions.rsvpedEvents.has(event.id) } : null
+          );
         } else {
-          // Still get like count even if not logged in
           const count = await getEventLikeCount(event.id);
           setLikeCount(count);
           setLiked(false);
@@ -230,8 +264,7 @@ export default function EventDetails() {
     try {
       const newLikedState = await toggleLikeService(currentUser.uid, event!.id);
       setLiked(newLikedState);
-      
-      // Reload like count
+
       const count = await getEventLikeCount(event!.id);
       setLikeCount(count);
     } catch (error) {
@@ -268,11 +301,11 @@ export default function EventDetails() {
       if (rsvped) {
         const newRSVPState = await toggleRSVPService(currentUser.uid, eventId);
         setRsvped(newRSVPState);
-        setEvent(prev => prev ? { ...prev, isUserAttending: newRSVPState } : null);
-        
+        setEvent((prev) => (prev ? { ...prev, isUserAttending: newRSVPState } : null));
+
         // Cancel all scheduled email notifications
         await cancelEmailNotifications(eventId, currentUser.uid);
-        
+
         alert(`RSVP canceled for "${eventTitle}"`);
         return;
       }
@@ -292,8 +325,7 @@ export default function EventDetails() {
 
     try {
       const { eventId, eventTitle } = pendingRSVP;
-      
-      // Create RSVP with notification preferences
+
       const newRSVPState = await toggleRSVPService(
         currentUser.uid,
         eventId,
@@ -303,10 +335,9 @@ export default function EventDetails() {
       );
 
       setRsvped(newRSVPState);
-      setEvent(prev => prev ? { ...prev, isUserAttending: newRSVPState } : null);
+      setEvent((prev) => (prev ? { ...prev, isUserAttending: newRSVPState } : null));
 
-      // Schedule email notification if enabled
-      if (preference.emailEnabled && preference.timing !== 'none' && currentUser.email) {
+      if (preference.emailEnabled && preference.timing !== "none" && currentUser.email) {
         try {
           await scheduleEmailNotification(
             eventId,
@@ -317,11 +348,9 @@ export default function EventDetails() {
           );
         } catch (emailError) {
           console.error("Error scheduling email notification:", emailError);
-          // Don't fail the RSVP if email scheduling fails
         }
       }
 
-      // Show confirmation
       try {
         await notifyRSVPConfirmation(eventTitle);
         await addDoc(collection(db, "notifications"), {
@@ -343,220 +372,161 @@ export default function EventDetails() {
   // Handle Add to Calendar
   const handleAddToCalendar = async (event: Event) => {
     try {
-      // Parse event date/time - handle both ISO format and separate date/time
-      let eventDateTime: Date;
-      
-      if (event.date && event.time) {
-        // Try parsing as separate date and time strings
-        // event.date might be ISO string or YYYY-MM-DD format
-        const dateStr = event.date.includes('T') ? event.date.split('T')[0] : event.date;
-        eventDateTime = new Date(`${dateStr}T${event.time}`);
-      } else if (event.date) {
-        // Fallback to just date (assume noon)
-        eventDateTime = new Date(event.date);
-        eventDateTime.setHours(12, 0, 0, 0);
-      } else {
-        throw new Error('Event date is missing');
-      }
+      // ✅ event.date is ISO now, so just use it
+      const eventDateTime = new Date(event.date);
 
-      // Validate date
       if (isNaN(eventDateTime.getTime())) {
-        throw new Error('Invalid event date/time');
+        throw new Error("Invalid event date/time");
       }
 
       // Format dates for ICS (YYYYMMDDTHHMMSSZ)
       const formatICSDate = (date: Date): string => {
         const year = date.getUTCFullYear();
-        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(date.getUTCDate()).padStart(2, '0');
-        const hours = String(date.getUTCHours()).padStart(2, '0');
-        const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-        const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+        const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(date.getUTCDate()).padStart(2, "0");
+        const hours = String(date.getUTCHours()).padStart(2, "0");
+        const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+        const seconds = String(date.getUTCSeconds()).padStart(2, "0");
         return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
       };
 
       const startTime = formatICSDate(eventDateTime);
-      const endTime = formatICSDate(new Date(eventDateTime.getTime() + 2 * 60 * 60 * 1000)); // Add 2 hours
-      
-      // Generate unique ID
+      const endTime = formatICSDate(new Date(eventDateTime.getTime() + 2 * 60 * 60 * 1000));
+
       const uid = `event-${event.id}-${Date.now()}@campuseventnotifier.app`;
-      
-      // Escape special characters for ICS format
+
       const escapeICS = (text: string): string => {
         return text
-          .replace(/\\/g, '\\\\')
-          .replace(/;/g, '\\;')
-          .replace(/,/g, '\\,')
-          .replace(/\n/g, '\\n');
+          .replace(/\\/g, "\\\\")
+          .replace(/;/g, "\\;")
+          .replace(/,/g, "\\,")
+          .replace(/\n/g, "\\n");
       };
-      
-      // Create ICS content
+
       const icsContent = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//Campus Event Notifier//EN',
-        'CALSCALE:GREGORIAN',
-        'METHOD:PUBLISH',
-        'BEGIN:VEVENT',
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Campus Event Notifier//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "BEGIN:VEVENT",
         `UID:${uid}`,
         `DTSTART:${startTime}`,
         `DTEND:${endTime}`,
         `DTSTAMP:${formatICSDate(new Date())}`,
         `SUMMARY:${escapeICS(event.title)}`,
-        `DESCRIPTION:${escapeICS(event.description || '')}\\n\\nLocation: ${escapeICS(event.location)}`,
+        `DESCRIPTION:${escapeICS(event.description || "")}\\n\\nLocation: ${escapeICS(event.location)}`,
         `LOCATION:${escapeICS(event.location)}`,
-        'STATUS:CONFIRMED',
-        'TRANSP:OPAQUE',
-        'END:VEVENT',
-        'END:VCALENDAR'
-      ].join('\r\n');
+        "STATUS:CONFIRMED",
+        "TRANSP:OPAQUE",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n");
 
-      // Handle web vs mobile differently
-      if (Platform.OS === 'web' && typeof document !== 'undefined') {
-        // Web: Use browser download
-        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      if (Platform.OS === "web" && typeof document !== "undefined") {
+        const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
-        link.download = `${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
+        link.download = `${event.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.ics`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        alert('Calendar file downloaded successfully!');
+        alert("Calendar file downloaded successfully!");
       } else {
-        // Mobile: Try file system first, fallback to data URI
-        const fileName = `${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
-        
-        // Check if file system is available
+        const fileName = `${event.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.ics`;
+
         const cacheDir = FileSystem.cacheDirectory;
         const docDir = FileSystem.documentDirectory;
         const directory = cacheDir || docDir;
-        
-        if (directory) {
-          // File system is available - use it
-          try {
-            const fileUri = `${directory}${directory.endsWith('/') ? '' : '/'}${fileName}`;
-            console.log('Writing calendar file to:', fileUri);
 
-            // Write file to device
+        if (directory) {
+          try {
+            const fileUri = `${directory}${directory.endsWith("/") ? "" : "/"}${fileName}`;
+
             await FileSystem.writeAsStringAsync(fileUri, icsContent, {
               encoding: EncodingType.UTF8,
             });
-            console.log('File written successfully');
 
-            // Verify file exists
             const fileInfo = await FileSystem.getInfoAsync(fileUri);
             if (!fileInfo.exists) {
-              throw new Error('File was not created successfully');
+              throw new Error("File was not created successfully");
             }
 
-            console.log('File info:', fileInfo);
-
-            // Check if sharing is available
             const isAvailable = await Sharing.isAvailableAsync();
-            console.log('Sharing available:', isAvailable);
-            
             if (isAvailable) {
-              try {
-                // Share the file (opens share dialog)
-                await Sharing.shareAsync(fileUri, {
-                  mimeType: 'text/calendar',
-                  dialogTitle: Platform.OS === 'ios' 
-                    ? 'Add to Calendar' 
-                    : 'Add to Calendar',
-                  UTI: Platform.OS === 'ios' ? 'com.apple.ical.ics' : undefined,
-                });
-                console.log('File shared successfully');
-                
-                // Show helpful instructions after sharing
-                setTimeout(() => {
-                  if (Platform.OS === 'ios') {
-                    Alert.alert(
-                      'How to Add to Calendar',
-                      'In the share menu:\n\n' +
-                      '• Tap "Add to Calendar" to open directly\n' +
-                      '• Or tap "Save to Files" then open Files app\n' +
-                      '• Or email it to yourself and open on a computer',
-                      [{ text: 'OK' }]
-                    );
-                  } else {
-                    Alert.alert(
-                      'How to Add to Calendar',
-                      'In the share menu:\n\n' +
-                      '• Tap "Google Calendar" if available\n' +
-                      '• Or tap "Save" to download the file\n' +
-                      '• Then open it with your calendar app',
-                      [{ text: 'OK' }]
-                    );
-                  }
-                }, 500);
-                
-                return; // Success, exit early
-              } catch (shareError: any) {
-                console.error('Error sharing file:', shareError);
-                // Fall through to data URI fallback
-              }
+              await Sharing.shareAsync(fileUri, {
+                mimeType: "text/calendar",
+                dialogTitle: "Add to Calendar",
+                UTI: Platform.OS === "ios" ? "com.apple.ical.ics" : undefined,
+              });
+
+              setTimeout(() => {
+                if (Platform.OS === "ios") {
+                  Alert.alert(
+                    "How to Add to Calendar",
+                    'In the share menu:\n\n• Tap "Add to Calendar"\n• Or "Save to Files" then open it\n• Or email it to yourself',
+                    [{ text: "OK" }]
+                  );
+                } else {
+                  Alert.alert(
+                    "How to Add to Calendar",
+                    'In the share menu:\n\n• Tap "Google Calendar" if available\n• Or save the file then open it with your calendar app',
+                    [{ text: "OK" }]
+                  );
+                }
+              }, 500);
+
+              return;
             }
           } catch (fileError: any) {
-            console.error('Error with file system approach:', fileError);
-            // Fall through to data URI fallback
+            console.error("Error with file system approach:", fileError);
           }
         }
-        
-        // Fallback: Use data URI approach (works without file system)
+
         try {
-          console.log('Using data URI fallback');
-          
-          // Create a data URI with the ICS content
-          // For mobile, we'll try to open it directly or copy to clipboard
           const dataUri = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`;
-          
-          // Try to open with Linking (some apps support data URIs)
+
           const canOpen = await Linking.canOpenURL(dataUri);
           if (canOpen) {
             await Linking.openURL(dataUri);
             return;
           }
-          
-          // If that doesn't work, try to copy content and show instructions
-          // Note: Clipboard API would require expo-clipboard, so we'll show the content
+
           alert(
-            `Calendar file ready!\n\n` +
-            `Since file system access is limited, please:\n` +
-            `1. Copy this link and open it in your browser\n` +
-            `2. Or use the share button to copy the calendar data\n\n` +
-            `Alternatively, try opening this app in a development build instead of Expo Go.`
+            `Calendar file ready!\n\nSince file system access is limited, please:\n1. Copy this link and open it in your browser\n2. Or use the share button\n\nTry a development build instead of Expo Go if needed.`
           );
-          
-          // Try to share the data URI as text
+
           if (await Sharing.isAvailableAsync()) {
-            // Create a temporary text file with instructions
-            const tempContent = `To add this event to your calendar, copy the following link and open it:\n\n${dataUri}\n\nOr use a calendar app that supports importing .ics files.`;
-            const tempFileUri = `${FileSystem.cacheDirectory || FileSystem.documentDirectory || ''}calendar_instructions.txt`;
-            
+            const tempContent = `To add this event to your calendar, copy and open:\n\n${dataUri}`;
+            const tempFileUri = `${FileSystem.cacheDirectory || FileSystem.documentDirectory || ""}calendar_instructions.txt`;
+
             try {
               if (FileSystem.cacheDirectory || FileSystem.documentDirectory) {
                 await FileSystem.writeAsStringAsync(tempFileUri, tempContent, {
                   encoding: EncodingType.UTF8,
                 });
                 await Sharing.shareAsync(tempFileUri, {
-                  dialogTitle: 'Calendar Event Instructions',
+                  dialogTitle: "Calendar Event Instructions",
                 });
               }
             } catch (e) {
-              // If even that fails, just show the data URI
-              console.log('Data URI:', dataUri);
+              console.log("Data URI:", dataUri);
             }
           }
         } catch (fallbackError: any) {
-          console.error('Error with data URI fallback:', fallbackError);
-          alert(`Unable to create calendar file. This may be a limitation of Expo Go. Try using a development build or web version. Error: ${fallbackError?.message || fallbackError}`);
+          console.error("Error with data URI fallback:", fallbackError);
+          alert(
+            `Unable to create calendar file. Try a development build or web version. Error: ${
+              fallbackError?.message || fallbackError
+            }`
+          );
         }
       }
     } catch (error: any) {
-      console.error('Error creating calendar file:', error);
-      alert(`Failed to create calendar file: ${error.message || 'Please try again.'}`);
+      console.error("Error creating calendar file:", error);
+      alert(`Failed to create calendar file: ${error.message || "Please try again."}`);
     }
   };
 
@@ -572,13 +542,16 @@ export default function EventDetails() {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Text style={[styles.notFoundText, { color: colors.text }]}>Event not found</Text>
-        <TouchableOpacity onPress={() => {
-          if (router.canGoBack()) {
-            router.back();
-          } else {
-            router.replace('/(tabs)/home');
-          }
-        }} style={[styles.backButtonText, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace("/(tabs)/home");
+            }
+          }}
+          style={[styles.backButtonText, { backgroundColor: colors.primary }]}
+        >
           <Text style={styles.backButtonTextLabel}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -596,38 +569,24 @@ export default function EventDetails() {
     });
   };
 
-  const getCategoryColor = (category: string): string => {
-    const colors: Record<string, string> = {
-      Academic: "#3B82F6",
-      Social: "#10B981",
-      Sports: "#EF4444",
-      Arts: "#A855F7",
-      Career: "#F97316",
-      Other: "#9CA3AF",
-    };
-    return colors[category] || colors["Other"];
-  };
+  const isEventFull = event.maxAttendees && event.attendees >= event.maxAttendees;
 
-  const isEventFull =
-    event.maxAttendees && event.attendees >= event.maxAttendees;
-  const isEventPast = new Date(event.date) < new Date();
+  // ✅ event.date is ISO now, so this comparison is correct
+  const isEventPast = new Date(event.date).getTime() < Date.now();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Hero Image */}
         <View style={styles.heroContainer}>
           <Image
-            source={{ 
-              uri: event.imageUrl || "https://via.placeholder.com/800x400.png?text=Event+Image"
+            source={{
+              uri: event.imageUrl || "https://via.placeholder.com/800x400.png?text=Event+Image",
             }}
             style={styles.heroImage}
             resizeMode="cover"
           />
-          
+
           {/* Header Overlay */}
           <View style={styles.heroHeader}>
             <TouchableOpacity
@@ -635,7 +594,7 @@ export default function EventDetails() {
                 if (router.canGoBack()) {
                   router.back();
                 } else {
-                  router.replace('/(tabs)/home');
+                  router.replace("/(tabs)/home");
                 }
               }}
               style={styles.backButton}
@@ -643,17 +602,17 @@ export default function EventDetails() {
             >
               <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              onPress={handleToggleFavorite} 
+
+            <TouchableOpacity
+              onPress={handleToggleFavorite}
               style={styles.heartButton}
               disabled={!currentUser}
               activeOpacity={0.8}
             >
-              <Ionicons 
-                name={favorited ? "heart" : "heart-outline"} 
-                size={24} 
-                color={favorited ? "#EF4444" : "#FFFFFF"} 
+              <Ionicons
+                name={favorited ? "heart" : "heart-outline"}
+                size={24}
+                color={favorited ? "#EF4444" : "#FFFFFF"}
               />
             </TouchableOpacity>
           </View>
@@ -662,14 +621,14 @@ export default function EventDetails() {
         {/* Content Section */}
         <View style={[styles.contentSection, { backgroundColor: colors.background }]}>
           <Text style={[styles.title, { color: colors.text }]}>{event.title}</Text>
-          
+
           {club && (
             <View style={styles.clubRow}>
               <Ionicons name="people" size={16} color={colors.primary} />
               <Text style={[styles.clubText, { color: colors.primary }]}>{club.name}</Text>
             </View>
           )}
-          
+
           <View style={styles.locationRow}>
             <Ionicons name="location" size={16} color={colors.primary} />
             <Text style={[styles.locationText, { color: colors.subtitle }]}>{event.location}</Text>
@@ -683,7 +642,7 @@ export default function EventDetails() {
             </View>
           )}
 
-          {/* Description with Read More */}
+          {/* Description */}
           <View style={styles.descriptionSection}>
             <Text style={[styles.description, { color: colors.subtitle }]} numberOfLines={undefined}>
               {event.fullDescription || event.description}
@@ -721,7 +680,7 @@ export default function EventDetails() {
 
           {/* Action Buttons */}
           <View style={styles.actionsCard}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.likeButton}
               onPress={handleToggleLike}
               disabled={!currentUser}
@@ -733,25 +692,42 @@ export default function EventDetails() {
                 color={liked ? "#EF4444" : colors.subtitle}
               />
               <Text style={[styles.actionText, { color: colors.subtitle }, liked && styles.likedText]}>
-                {likeCount} {likeCount === 1 ? 'like' : 'likes'}
+                {likeCount} {likeCount === 1 ? "like" : "likes"}
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* RSVP Button - Only show for approved events */}
-          {event.status && event.status !== 'approved' ? (
-            <View style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}>
+          {event.status && event.status !== "approved" ? (
+            <View
+              style={[
+                styles.primaryButton,
+                styles.disabledButton,
+                {
+                  backgroundColor: colors.border,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                },
+              ]}
+            >
               <Ionicons name="time-outline" size={20} color={colors.subtitle} />
               <Text style={[styles.primaryButtonText, { color: colors.subtitle, marginLeft: 8 }]}>
-                {event.status === 'pending' ? 'Event Pending Approval' : 'Event Not Available'}
+                {event.status === "pending" ? "Event Pending Approval" : "Event Not Available"}
               </Text>
             </View>
           ) : isEventPast ? (
-            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border }]} disabled>
+            <TouchableOpacity
+              style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border }]}
+              disabled
+            >
               <Text style={styles.primaryButtonText}>Event has ended</Text>
             </TouchableOpacity>
           ) : isEventFull && !rsvped ? (
-            <TouchableOpacity style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border }]} disabled>
+            <TouchableOpacity
+              style={[styles.primaryButton, styles.disabledButton, { backgroundColor: colors.border }]}
+              disabled
+            >
               <Text style={styles.primaryButtonText}>Event is full</Text>
             </TouchableOpacity>
           ) : (
@@ -763,12 +739,7 @@ export default function EventDetails() {
               onPress={() => handleRSVP(event.id, event.title)}
               activeOpacity={0.8}
             >
-              <Text
-                style={[
-                  styles.primaryButtonText,
-                  rsvped && { color: colors.text },
-                ]}
-              >
+              <Text style={[styles.primaryButtonText, rsvped && { color: colors.text }]}>
                 {rsvped ? "Cancel RSVP" : "RSVP to Event"}
               </Text>
             </TouchableOpacity>
@@ -795,20 +766,8 @@ export default function EventDetails() {
             setPendingRSVP(null);
           }}
           onConfirm={handleRSVPConfirm}
-          eventDate={(() => {
-            // Parse event date - handle both ISO format and separate date/time
-            try {
-              if (event.date && event.time) {
-                const dateStr = event.date.includes('T') ? event.date.split('T')[0] : event.date;
-                return new Date(`${dateStr}T${event.time}`);
-              } else if (event.date) {
-                return new Date(event.date);
-              }
-              return new Date();
-            } catch {
-              return new Date();
-            }
-          })()}
+          // ✅ event.date is ISO now
+          eventDate={new Date(event.date)}
         />
       )}
     </View>
@@ -958,12 +917,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  cancelButtonStyle: {
-  },
-  cancelButtonText: {
-  },
-  disabledButton: {
-  },
+  cancelButtonStyle: {},
+  cancelButtonText: {},
+  disabledButton: {},
   secondaryButton: {
     flexDirection: "row",
     alignItems: "center",

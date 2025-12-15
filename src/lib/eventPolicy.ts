@@ -42,7 +42,18 @@ export const getEventPolicy = async (): Promise<EventPolicy> => {
     if (error) {
       // If it's a permission/authorization error (RLS or 401), silently use default policy
       // This is expected if RLS policies aren't set up yet or user is not authenticated
-      if (error.code === '42501' || error.code === 'PGRST301' || error.status === 401 || error.message?.includes('401')) {
+      const msg = (error?.message || "").toLowerCase();
+
+if (
+  error?.code === "42501" ||          // RLS / insufficient_privilege
+  error?.code === "PGRST301" ||       // PostgREST auth-related
+  msg.includes("401") ||
+  msg.includes("jwt") ||
+  msg.includes("unauthorized") ||
+  msg.includes("permission") ||
+  msg.includes("row-level security")
+) {
+
         // Silently use default policy - this is expected behavior
         return DEFAULT_POLICY;
       }
@@ -111,7 +122,18 @@ export const setEventPolicy = async (policy: EventPolicy): Promise<void> => {
 
     if (error) {
       // If it's a permission/authorization error, don't throw - just log
-      if (error.code === '42501' || error.code === 'PGRST301' || error.status === 401) {
+      const msg = (error?.message || "").toLowerCase();
+
+if (
+  error?.code === "42501" ||        // RLS / permission denied
+  error?.code === "PGRST301" ||     // auth / policy error
+  msg.includes("401") ||
+  msg.includes("unauthorized") ||
+  msg.includes("permission") ||
+  msg.includes("row level security") ||
+  msg.includes("jwt")
+) {
+
         console.log('Cannot set event policy (RLS/Unauthorized), using default policy');
         return; // Silently fail - default policy will be used
       }

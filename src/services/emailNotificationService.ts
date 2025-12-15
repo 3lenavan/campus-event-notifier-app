@@ -1,13 +1,10 @@
-import { supabase } from '../../data/supabaseClient';
-import { Event } from '../types';
-import { getEventById } from './eventsService';
-import { listClubs } from './clubsService';
-import { NotificationTiming } from './interactionsService';
+import { supabase } from "../../data/supabaseClient";
+import { getEventById } from "./eventsService";
+import { NotificationTiming } from "./interactionsService";
 
 /**
  * Schedules an email notification for an RSVP'd event.
- * This function stores the notification request in the database,
- * which is then processed by a backend job (e.g., Supabase Edge Function + pg_cron).
+ * Stores the request in the email_notifications table.
  */
 export const scheduleEmailNotification = async (
   eventId: string,
@@ -19,83 +16,80 @@ export const scheduleEmailNotification = async (
   try {
     const event = await getEventById(eventId);
     if (!event) {
-      console.error('Event not found for email notification scheduling');
+      console.error("Event not found for email notification scheduling");
       return;
     }
 
-    const clubs = await listClubs();
-    const club = clubs.find(c => c.id === event.clubId);
-    const clubName = club?.name || 'Unknown Club';
-
-    // Calculate the actual reminder time based on timing preference
+    // Calculate the reminder time
     const eventDate = new Date(event.dateISO);
     let reminderTime: Date;
 
-    if (timing === 'custom' && customTime) {
+    if (timing === "custom" && customTime) {
       reminderTime = new Date(customTime);
     } else {
       reminderTime = new Date(eventDate);
+
       switch (timing) {
-        case '15min':
+        case "15min":
           reminderTime.setMinutes(reminderTime.getMinutes() - 15);
           break;
-        case '30min':
+        case "30min":
           reminderTime.setMinutes(reminderTime.getMinutes() - 30);
           break;
-        case '1hour':
+        case "1hour":
           reminderTime.setHours(reminderTime.getHours() - 1);
           break;
-        case '2hours':
+        case "2hours":
           reminderTime.setHours(reminderTime.getHours() - 2);
           break;
-        case '1day':
+        case "1day":
           reminderTime.setDate(reminderTime.getDate() - 1);
           break;
-        case '1week':
+        case "1week":
           reminderTime.setDate(reminderTime.getDate() - 7);
           break;
-        case 'none':
-          // Don't schedule if none
-          return;
+        case "none":
+          return; // don't schedule
         default:
-          console.error('Invalid notification timing:', timing);
+          console.error("Invalid notification timing:", timing);
           return;
       }
     }
 
-    // Don't schedule if reminder time is in the past
+    // Don't schedule in the past
     if (reminderTime <= new Date()) {
-      console.warn('Reminder time is in the past, not scheduling');
+      console.warn("Reminder time is in the past, not scheduling");
       return;
     }
 
-    const { error } = await supabase.from('email_notifications').insert({
-      event_id: eventId,
-      user_id: userId,
+    const payload = {
+      event_id: Number(eventId), // bigint in DB
+      firebase_uid: userId, // DB column name
       user_email: userEmail,
       event_title: event.title,
       event_date_iso: event.dateISO,
-      event_location: event.location,
-      club_name: clubName,
-      notification_timing: timing,
       reminder_time: reminderTime.toISOString(),
-      scheduled_at: new Date().toISOString(),
-    });
+      status: "pending",
+    };
+
+    const { error } = await supabase.from("email_notifications").insert(payload);
 
     if (error) {
-      console.error('Error scheduling email notification:', error);
+      console.error("Error scheduling email notification:", error);
       throw error;
     }
 
-    console.log(`Email notification scheduled for event ${eventId} for user ${userId} at ${timing}`);
+    console.log(
+      `Email notification scheduled for event ${eventId} for user ${userId} at ${timing}`
+    );
   } catch (error) {
-    console.error('Failed to schedule email notification:', error);
+    console.error("Failed to schedule email notification:", error);
     throw error;
   }
 };
 
 /**
- * Cancels all pending email notifications for a specific RSVP.
+ * Cancels pending email notifications for a specific RSVP.
  */
 export const cancelEmailNotifications = async (
   eventId: string,
@@ -103,20 +97,20 @@ export const cancelEmailNotifications = async (
 ): Promise<void> => {
   try {
     const { error } = await supabase
-      .from('email_notifications')
+      .from("email_notifications")
       .delete()
-      .eq('event_id', eventId)
-      .eq('user_id', userId)
-      .eq('status', 'pending');
+      .eq("event_id", Number(eventId)) // bigint-safe
+      .eq("firebase_uid", userId) // correct column name
+      .eq("status", "pending");
 
     if (error) {
-      console.error('Error canceling email notifications:', error);
+      console.error("Error canceling email notifications:", error);
       throw error;
     }
 
     console.log(`Email notifications cancelled for event ${eventId} for user ${userId}`);
   } catch (error) {
-    console.error('Failed to cancel email notifications:', error);
+    console.error("Failed to cancel email notifications:", error);
     throw error;
   }
 };
@@ -130,14 +124,14 @@ export const getRSVPNotificationPreferences = async (
 ): Promise<{ timing: NotificationTiming | null; emailEnabled: boolean }> => {
   try {
     const { data, error } = await supabase
-      .from('event_rsvp')
-      .select('notification_timing, email_notifications_enabled')
-      .eq('firebase_uid', userId)
-      .eq('event_id', eventId)
+      .from("event_rsvp")
+      .select("notification_timing, email_notifications_enabled")
+      .eq("firebase_uid", userId)
+      .eq("event_id", Number(eventId)) // bigint-safe
       .maybeSingle();
 
     if (error) {
-      console.error('Error getting RSVP notification preferences:', error);
+      console.error("Error getting RSVP notification preferences:", error);
       return { timing: null, emailEnabled: false };
     }
 
@@ -146,8 +140,9 @@ export const getRSVPNotificationPreferences = async (
       emailEnabled: data?.email_notifications_enabled || false,
     };
   } catch (error) {
-    console.error('Failed to get RSVP notification preferences:', error);
+    console.error("Failed to get RSVP notification preferences:", error);
     return { timing: null, emailEnabled: false };
   }
 };
+
 
