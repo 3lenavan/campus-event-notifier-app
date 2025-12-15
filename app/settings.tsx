@@ -22,14 +22,6 @@ export default function Settings() {
 
       <TouchableOpacity
         style={[styles.card, styles.cardSpacing, { backgroundColor: colors.card, borderColor: colors.border }]}
-        onPress={() => router.push("/update-email")}
-      >
-        <Text style={[styles.title, { color: colors.text }]}>Update Email</Text>
-        <Text style={[styles.subtitle, { color: colors.subtitle }]}>Change your account email</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.card, styles.cardSpacing, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={() => router.push("/update-password")}
       >
         <Text style={[styles.title, { color: colors.text }]}>Update Password</Text>
